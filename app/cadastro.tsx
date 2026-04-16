@@ -49,9 +49,9 @@ export default function Register() {
         setErrorMsg('Este e-mail já está cadastrado.');
         return;
       }
-
-      // Adicionar novo usuário
-      const newUser = { nome, email, senha };
+      
+      // Adicionar novo usuário (Contas novas sempre nascem como usuário comum)
+      const newUser = { nome, email, senha, isAdmin: false };
       users.push(newUser);
 
       // Salvar de volta no storage (offline)

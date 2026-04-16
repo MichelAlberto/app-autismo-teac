@@ -1,11 +1,41 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles } from '../../styles/home.styles';
 
 export default function Home() {
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userJson = await AsyncStorage.getItem('teac_current_user');
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          setUserName(user.isAdmin ? 'ADMINISTRADOR' : user.nome);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleLogout = () => {
+    Alert.alert('Sair', 'Tem certeza que deseja deslogar e voltar ao início?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: async () => {
+          await AsyncStorage.removeItem('teac_current_user');
+          router.replace('/');
+        }
+      }
+    ]);
+  };
+
   return (
     <LinearGradient
       // Manteremos um gradiente claro suave de azul para lilás para combinar com o layout
@@ -15,9 +45,13 @@ export default function Home() {
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={28} color="#e53935" />
+          </TouchableOpacity>
+
           {/* SAUDAÇÃO INICIAL */}
           <View style={styles.greetingHeader}>
-            <Text style={styles.greetingTitle}>Bem-vindo de volta!</Text>
+            <Text style={styles.greetingTitle}>Bem-vindo de volta{userName ? `, ${userName}` : ''}!</Text>
             <Text style={styles.greetingSubtitle}>Continue a jornada de aprendizado.</Text>
           </View>
 
@@ -36,10 +70,10 @@ export default function Home() {
                   <FontAwesome5 name="graduation-cap" size={16} color="#e57373" />
                   <Text style={styles.statText}>Cursos concluídos: 3 de 8</Text>
                 </View>
-                <View style={styles.statItem}>
+                <TouchableOpacity style={styles.statItem} onPress={() => router.push('/forum')}>
                   <Ionicons name="chatbubble" size={16} color="#64b5f6" />
-                  <Text style={styles.statText}>Fórum: 2 novas respostas</Text>
-                </View>
+                  <Text style={[styles.statText, { textDecorationLine: 'underline', fontWeight: 'bold' }]}>Acessar o Fórum Central</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.lastActivityBox}>

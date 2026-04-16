@@ -12,6 +12,13 @@ export const styles = StyleSheet.create({
   greetingHeader: {
     marginBottom: 20,
     marginTop: -10,
+    paddingRight: 40,
+  },
+  logoutBtn: {
+    position: 'absolute',
+    top: 30,
+    right: 20,
+    zIndex: 10,
   },
   greetingTitle: {
     fontSize: 26,
@@ -169,8 +176,8 @@ export const styles = StyleSheet.create({
   },
   absoluteRingContainer: {
     position: 'absolute',
-    right: -25,
-    top: '10%',
+    right: 10,
+    top: 15,
     width: 170,
     height: 170,
     alignItems: 'center',

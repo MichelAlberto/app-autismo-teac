@@ -31,6 +31,14 @@ export default function Index() {
       return;
     }
 
+    // CONTA MESTRE DO ADMINISTRADOR: Invade o sistema diretamente
+    if (email.toLowerCase() === 'admin' && senha === 'admin') {
+      const adminUser = { nome: 'Supervisor', email: 'admin', isAdmin: true };
+      await AsyncStorage.setItem('teac_current_user', JSON.stringify(adminUser));
+      router.push('/(tabs)/home');
+      return;
+    }
+
     try {
       const usersJson = await AsyncStorage.getItem('teac_users');
       const users = usersJson ? JSON.parse(usersJson) : [];
@@ -39,6 +47,7 @@ export default function Index() {
 
       if (validUser) {
         // Sucesso (Avança para a home)
+        await AsyncStorage.setItem('teac_current_user', JSON.stringify(validUser));
         router.push('/(tabs)/home');
       } else {
         setErrorMsg('E-mail ou senha incorretos.');
@@ -48,7 +57,8 @@ export default function Index() {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    await AsyncStorage.setItem('teac_current_user', JSON.stringify({ nome: 'Usuário Google', email: 'google@test.com', isAdmin: false }));
     Alert.alert('Sucesso', 'Login com Google efetuado com sucesso (offline)!', [
       { text: 'OK', onPress: () => router.push('/(tabs)/home') }
     ]);
