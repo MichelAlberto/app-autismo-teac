@@ -92,8 +92,11 @@ export default function Home() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.iniciarCursoBtn}>
-              <Text style={styles.iniciarCursoBtnText}> Ir para  o curso </Text>
+            <TouchableOpacity
+              style={styles.iniciarCursoBtn}
+              onPress={() => router.push("/course")}
+            >
+              <Text style={styles.iniciarCursoBtnText}>Iniciar Curso</Text>
               <Ionicons name="chevron-forward" size={18} color="#ffffff" />
             </TouchableOpacity>
 
