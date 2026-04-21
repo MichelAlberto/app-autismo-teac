@@ -190,21 +190,23 @@ export default function Home() {
           <View style={styles.gridMenu}>
             <TouchableOpacity
               style={[styles.gridSquare, { backgroundColor: "#b2dfdb" }]}
+              onPress={() => router.push("/relatorios")}
             >
               <MaterialCommunityIcons
-                name="calendar-check"
+                name="file-document-edit-outline"
                 size={28}
                 color="#4db6ac"
                 style={styles.gridIconContainer}
               />
-              <Text style={styles.gridText}>Agendar{"\n"}consulta</Text>
+              <Text style={styles.gridText}>Relatório de{"\n"}comportamentos</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.gridSquare, { backgroundColor: "#ffcc80" }]}
+              onPress={() => router.push("/registrar-comportamento")}
             >
               <MaterialCommunityIcons
-                name="clipboard-text"
+                name="clipboard-plus-outline"
                 size={28}
                 color="#ff9800"
                 style={styles.gridIconContainer}

@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
+    Animated,
     Dimensions,
     FlatList,
     Text,
@@ -515,6 +516,128 @@ export default function TopicDetail() {
     flatListRef.current?.scrollToIndex({ index, animated: true });
   };
 
+  const parseContent = (item: { title: string; content: string }) => {
+    let question = item.title;
+    let answer = item.content;
+
+    // Lógica especial para Mitos e Verdades
+    const lowerTitle = item.title.toLowerCase();
+    if (lowerTitle.includes("mito:") || lowerTitle.includes("verdade:")) {
+      const parts = item.title.split(":");
+      const type = parts[0].trim();
+      question = parts[1].trim();
+      
+      // Se não terminar com pontuação, adiciona uma interrogação para a pergunta
+      if (!question.endsWith("?") && !question.endsWith(".") && !question.endsWith("!")) {
+        question = question + "?";
+      }
+      
+      answer = type.toUpperCase() + ": " + item.content;
+    }
+
+    return { question, answer };
+  };
+
+  const Flashcard = ({
+    item,
+    index,
+  }: {
+    item: { title: string; content: string; icon: string };
+    index: number;
+  }) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+    const animatedValue = useRef(new Animated.Value(0)).current;
+
+    const flipCard = () => {
+      if (isFlipped) {
+        Animated.spring(animatedValue, {
+          toValue: 0,
+          friction: 8,
+          tension: 10,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        Animated.spring(animatedValue, {
+          toValue: 180,
+          friction: 8,
+          tension: 10,
+          useNativeDriver: true,
+        }).start();
+      }
+      setIsFlipped(!isFlipped);
+    };
+
+    const frontInterpolate = animatedValue.interpolate({
+      inputRange: [0, 180],
+      outputRange: ["0deg", "180deg"],
+    });
+
+    const backInterpolate = animatedValue.interpolate({
+      inputRange: [0, 180],
+      outputRange: ["180deg", "360deg"],
+    });
+
+    const frontAnimatedStyle = {
+      transform: [{ rotateY: frontInterpolate }],
+    };
+
+    const backAnimatedStyle = {
+      transform: [{ rotateY: backInterpolate }],
+    };
+
+    const { question, answer } = parseContent(item);
+    const bgColor = autismColors[index % autismColors.length];
+
+    return (
+      <View style={styles.slide}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={flipCard}
+          style={styles.card}
+        >
+          {/* LADO DA FRENTE */}
+          <Animated.View
+            style={[
+              styles.cardFace,
+              { backgroundColor: bgColor },
+              frontAnimatedStyle,
+            ]}
+          >
+            <View style={styles.slideIconContainer}>
+              <Ionicons name={item.icon as any} size={70} color="#ffffff" />
+            </View>
+            <Text style={styles.slideTitle}>{question}</Text>
+
+            <View style={styles.instructionContainer}>
+              <Ionicons name="hand-index" size={18} color="#ffffff" />
+              <Text style={styles.instructionText}>Toque para ver a resposta</Text>
+            </View>
+          </Animated.View>
+
+          {/* LADO DE TRÁS */}
+          <Animated.View
+            style={[
+              styles.cardFace,
+              styles.cardBack,
+              { backgroundColor: bgColor },
+              backAnimatedStyle,
+            ]}
+          >
+            <View style={styles.backLabel}>
+              <Text style={styles.backLabelText}>RESPOSTA</Text>
+            </View>
+            <Text style={styles.slideContent}>{answer}</Text>
+
+            <View style={styles.instructionContainer}>
+              <Ionicons name="refresh-outline" size={18} color="#ffffff" />
+              <Text style={styles.instructionText}>Toque para voltar</Text>
+            </View>
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderSlide = ({
     item,
     index,
@@ -522,16 +645,7 @@ export default function TopicDetail() {
     item: { title: string; content: string; icon: string };
     index: number;
   }) => {
-    const bgColor = autismColors[index % autismColors.length];
-    return (
-      <View style={[styles.slide, { backgroundColor: bgColor }]}>
-        <View style={styles.slideIconContainer}>
-          <Ionicons name={item.icon as any} size={60} color="#ffffff" />
-        </View>
-        <Text style={styles.slideTitle}>{item.title}</Text>
-        <Text style={styles.slideContent}>{item.content}</Text>
-      </View>
-    );
+    return <Flashcard item={item} index={index} />;
   };
 
   const renderDot = (index: number) => (

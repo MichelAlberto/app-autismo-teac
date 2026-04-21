@@ -42,16 +42,31 @@ export const styles = StyleSheet.create({
   slide: {
     width: 320,
     height: screenHeight * 0.7, // Ajustar altura baseada na tela
+    marginHorizontal: 8,
+    alignSelf: "center", // Centralizar horizontalmente
+  },
+  card: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  cardFace: {
+    width: '100%',
+    height: '100%',
     borderRadius: 24,
     padding: 32,
-    marginHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    position: 'absolute',
+    backfaceVisibility: 'hidden',
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "center", // Centralizar horizontalmente
+  },
+  cardBack: {
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   slideIconContainer: {
     marginBottom: 24,
@@ -70,7 +85,40 @@ export const styles = StyleSheet.create({
     color: "#ffffff",
     lineHeight: 28,
     textAlign: "center",
-    opacity: 0.95,
+    opacity: 1,
+  },
+  instructionContainer: {
+    position: 'absolute',
+    bottom: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  instructionText: {
+    color: '#ffffff',
+    fontSize: 13,
+    marginLeft: 6,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  backLabel: {
+    position: 'absolute',
+    top: 20,
+    right: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  backLabelText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   dotsContainer: {
     flexDirection: "row",
