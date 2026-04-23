@@ -1,62 +1,50 @@
+import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
-  FlatList,
-  StyleSheet,
+  FlatList, Image, StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ViewToken,
+  ViewToken
 } from "react-native";
 
-// Dimensões da tela para ocupar 100% da visualização
-const { width } = Dimensions.get("window");
+// Dimensões da TELA (screen) em vez de window para pegar a área total (incluindo barras)
+const { width, height } = Dimensions.get("screen");
 
 // Interface para os slides
 interface Slide {
   id: string;
   title: string;
   description: string;
-  color: string;
-  icon: string;
+  icon: any;
 }
 
-// Você pode substituir os ícones ou imagens depois
+// Slides atualizados com as novas imagens e frases originais
 const SLIDES: Slide[] = [
   {
     id: "1",
     title: "Bem-vindo ao TEAC!",
     description:
       "Um espaço de apoio, aprendizado e conexão para autistas, familiares e profissionais.",
-    color: "#E0F2FE", // Azul claro
-    icon: "🚀", // Temporário, pode ser substituído por `<Image>`
+    icon: require("../assets/pnghome1.png"),
   },
   {
     id: "2",
     title: "Fórum e Comunidade",
     description:
       "Tire suas dúvidas e converse com outras pessoas que compartilham da mesma vivência.",
-    color: "#FEF08A", // Amarelo claro
-    icon: "💬",
+    icon: require("../assets/pnghome2.png"),
   },
   {
     id: "3",
-    title: "Acesso a Profissionais",
-    description:
-      "Encontre profissionais qualificados para responder perguntas e te guiar na jornada.",
-    color: "#BBF7D0", // Verde claro
-    icon: "⚕️",
-  },
-  {
-    id: "4",
     title: "Pronto para Começar?",
     description:
-      "Faça seu login ou cadastre-se agora mesmo para acessar todos os recursos!",
-    color: "#E9D5FF", // Roxo claro
-    icon: "✨",
+      "Encontre profissionais qualificados para te guiar e acesse todos os recursos agora mesmo!",
+    icon: require("../assets/pnghome3.png"),
   },
 ];
 
@@ -92,50 +80,53 @@ export default function SlidesApresentacao() {
 
   const renderItem = ({ item }: { item: Slide }) => {
     return (
-      <View style={[styles.slideContainer, { backgroundColor: item.color }]}>
-        <Text style={styles.icon}>{item.icon}</Text>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
+      <View style={styles.slideContainer}>
+        {/* Overlay opcional para garantir leitura */}
+        <View style={styles.overlay} />
+
+        <View style={styles.contentContainer}>
+          <Image source={item.icon} style={styles.iconImage} resizeMode="contain" />
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.description}>{item.description}</Text>
+          </View>
+        </View>
       </View>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* O FLATLIST OCUPA A TELA TODA */}
-      <View style={StyleSheet.absoluteFillObject}>
-        <FlatList
-          data={SLIDES}
-          renderItem={renderItem}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={width}
-          decelerationRate="fast"
-          bounces={false}
-          keyExtractor={(item) => item.id}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            {
-              useNativeDriver: false,
-            },
-          )}
-          scrollEventThrottle={32}
-          onViewableItemsChanged={viewableItemsChanged}
-          viewabilityConfig={viewConfig}
-          ref={slidesRef}
-        />
-      </View>
+      {/* Força o conteúdo a ficar por baixo da barra de status */}
+      <StatusBar translucent backgroundColor="transparent" style="light" />
+      
+      <Image 
+        source={require("../assets/fundo.png")} 
+        style={styles.backgroundImage} 
+        resizeMode="cover" 
+      />
 
-      {/* ÁREA DOS BOTÕES E BOLINHAS (Rodapé Sobreposto) */}
+      <FlatList
+        data={SLIDES}
+        renderItem={renderItem}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        pagingEnabled
+        bounces={false}
+        keyExtractor={(item) => item.id}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          {
+            useNativeDriver: false,
+          },
+        )}
+        scrollEventThrottle={32}
+        onViewableItemsChanged={viewableItemsChanged}
+        viewabilityConfig={viewConfig}
+        ref={slidesRef}
+      />
+
       <View style={styles.footer}>
-        {/* Botão de Avançar / Iniciar (Agora em cima) */}
-        <TouchableOpacity style={styles.button} onPress={nextSlide}>
-          <Text style={styles.buttonText}>
-            {currentIndex === SLIDES.length - 1 ? "Acessar Login" : "Próximo"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Bolinhas (Paginator agora embaixo do botão) */}
         <View style={styles.paginatorContainer}>
           {SLIDES.map((_, i) => {
             const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
@@ -158,6 +149,12 @@ export default function SlidesApresentacao() {
             );
           })}
         </View>
+
+        <TouchableOpacity style={styles.button} onPress={nextSlide}>
+          <Text style={styles.buttonText}>
+            {currentIndex === SLIDES.length - 1 ? "Começar" : "Próximo"}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -166,42 +163,74 @@ export default function SlidesApresentacao() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#000",
+  },
+  backgroundImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: width,
+    height: height,
   },
   slideContainer: {
     width,
-    justifyContent: "center",
+    height,
     alignItems: "center",
-    padding: 30,
+    justifyContent: "center",
   },
-  icon: {
-    fontSize: 100,
-    marginBottom: 40,
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.25)", // Overlay leve para ajudar na leitura
+  },
+  contentContainer: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 30,
+    paddingTop: 50,
+  },
+  iconImage: {
+    width: width * 0.9,
+    height: height * 0.45,
+    marginBottom: 20,
+  },
+  textContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 100, // Espaço para o rodapé
   },
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#1E293B",
+    color: "#FFFFFF",
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 15,
+    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   description: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#475569",
+    color: "#FFFFFF",
     textAlign: "center",
     lineHeight: 24,
-    paddingHorizontal: 20,
+    textShadowColor: "rgba(0, 0, 0, 0.4)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   footer: {
     position: "absolute",
-    bottom: 40,
-    left: 20,
-    right: 20,
-    gap: 20, // Espaçamento entre botão e bolinhas
+    bottom: 50,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingHorizontal: 30,
   },
   paginatorContainer: {
     flexDirection: "row",
+    height: 64,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -213,15 +242,16 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: "#3B82F6",
-    padding: 16,
-    borderRadius: 30,
+    width: "100%",
+    padding: 18,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#3B82F6",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 5,
+    elevation: 8,
   },
   buttonText: {
     color: "#fff",
@@ -229,3 +259,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+

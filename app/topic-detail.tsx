@@ -609,8 +609,7 @@ export default function TopicDetail() {
             <Text style={styles.slideTitle}>{question}</Text>
 
             <View style={styles.instructionContainer}>
-              <Ionicons name="hand-index" size={18} color="#ffffff" />
-              <Text style={styles.instructionText}>Toque para ver a resposta</Text>
+              <Text style={styles.instructionText}>Ver a resposta</Text>
             </View>
           </Animated.View>
 

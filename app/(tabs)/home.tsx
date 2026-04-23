@@ -13,24 +13,67 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../../styles/home.styles";
+import { generateCertificate } from "../../components/CertificateGenerator";
+
+// Lista de dicas focadas em Autismo
+const TIPS = [
+  "Dê instruções claras e curtas para facilitar a compreensão.",
+  "Use apoios visuais para tornar a rotina mais previsível e segura.",
+  "O tempo de processamento pode ser maior; espere 10 segundos antes de repetir.",
+  "Celebre as pequenas conquistas de hoje; elas são grandes vitórias!",
+  "Mantenha a rotina previsível para reduzir a ansiedade e o estresse.",
+  "Respeite os limites sensoriais; cada pessoa percebe o mundo de um jeito único.",
+  "Comunicação não é apenas fala; observe gestos, olhares e expressões.",
+  "Prepare a criança com antecedência para mudanças na programação.",
+  "Crie um 'espaço seguro' em casa para momentos de sobrecarga sensorial.",
+  "Foque nos interesses da criança para criar momentos de conexão.",
+  "Sua saúde mental também importa; tire um momento para respirar hoje.",
+  "A paciência é a maior ferramenta de ensino que você possui."
+];
 
 export default function Home() {
   const [userName, setUserName] = useState("");
+  const [isCourseComplete, setIsCourseComplete] = useState(false);
+  const [dailyTip, setDailyTip] = useState("");
 
   useEffect(() => {
-    const fetchUser = async () => {
+    // Sorteia uma dica ao carregar
+    const randomIndex = Math.floor(Math.random() * TIPS.length);
+    setDailyTip(TIPS[randomIndex]);
+
+    const fetchUserAndProgress = async () => {
       try {
+        // Busca Usuário
         const userJson = await AsyncStorage.getItem("teac_current_user");
         if (userJson) {
           const user = JSON.parse(userJson);
           setUserName(user.isAdmin ? "ADMINISTRADOR" : user.nome);
         }
+
+        // Busca Progresso do Curso
+        const progress = await AsyncStorage.getItem("course_progress");
+        if (progress) {
+          const completed = JSON.parse(progress);
+          // O curso tem 15 tópicos no total (5 módulos x 3 tópicos)
+          if (completed.length >= 15) {
+            setIsCourseComplete(true);
+          }
+        }
       } catch (e) {
         console.error(e);
       }
     };
-    fetchUser();
+    fetchUserAndProgress();
   }, []);
+
+  const handleDownloadCertificate = async () => {
+    const today = new Date().toLocaleDateString('pt-BR');
+    try {
+      await generateCertificate(userName || "Estudante TEAC", today);
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível gerar o certificado. Verifique as permissões.");
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("Sair", "Tem certeza que deseja deslogar e voltar ao início?", [
@@ -72,33 +115,57 @@ export default function Home() {
           </View>
 
           {/* CARD 1: COMECE SUA JORNADA */}
-          <View style={styles.journeyCard}>
-            <Text style={styles.cardTitle}>Comece sua jornada</Text>
+          <View style={[styles.journeyCard, isCourseComplete && { backgroundColor: '#ffffff', borderColor: '#ff9800', borderWidth: 1 }]}>
+            <Text style={styles.cardTitle}>
+              {isCourseComplete ? "Jornada Concluída! 🎉" : "Comece sua jornada"}
+            </Text>
 
             <View style={styles.journeyContent}>
               <View style={styles.journeyTextSection}>
-                <View style={styles.bulletItem}>
-                  <View style={styles.bulletDot} />
-                  <Text style={styles.bulletText}>
-                    Aprenda as praticas de rotina e comunicação do TEA.
+                {isCourseComplete ? (
+                  <Text style={[styles.bulletText, { color: '#ff9800', fontWeight: 'bold' }]}>
+                    Parabéns! Você concluiu todos os módulos e está pronto para aplicar seus conhecimentos.
                   </Text>
-                </View>
-                <View style={styles.bulletItem}>
-                  <View style={styles.bulletDot} />
-                  <Text style={styles.bulletText}>
-                    Conclua e receba seu certificado!
-                  </Text>
-                </View>
+                ) : (
+                  <>
+                    <View style={styles.bulletItem}>
+                      <View style={styles.bulletDot} />
+                      <Text style={styles.bulletText}>
+                        Aprenda as praticas de rotina e comunicação do TEA.
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <View style={styles.bulletDot} />
+                      <Text style={styles.bulletText}>
+                        Conclua e receba seu certificado!
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.iniciarCursoBtn}
-              onPress={() => router.push("/course")}
-            >
-              <Text style={styles.iniciarCursoBtnText}>Iniciar Curso</Text>
-              <Ionicons name="chevron-forward" size={18} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'column', gap: 10 }}>
+              <TouchableOpacity
+                style={[styles.iniciarCursoBtn, isCourseComplete && { backgroundColor: '#ff9800' }]}
+                onPress={() => router.push("/course")}
+              >
+                <Text style={styles.iniciarCursoBtnText}>
+                  {isCourseComplete ? "Rever Curso" : "Iniciar Curso"}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#ffffff" />
+              </TouchableOpacity>
+
+              {isCourseComplete && (
+                <TouchableOpacity
+                  style={[styles.iniciarCursoBtn, { backgroundColor: '#4caf50' }]}
+                  onPress={handleDownloadCertificate}
+                >
+                  <Text style={styles.iniciarCursoBtnText}>Certificado</Text>
+                  <Ionicons name="ribbon-outline" size={18} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Imagem Flutuante na Direita */}
             <View style={styles.absoluteRingContainer}>
@@ -170,11 +237,11 @@ export default function Home() {
           {/* CARD 3: DICA DO DIA */}
           <View style={styles.tipCard}>
             <View style={styles.tipHeader}>
-              <Ionicons name="bulb" size={24} color="#aed581" />
+              <Ionicons name="bulb" size={24} color="#ff9800" />
               <Text style={styles.tipTitle}>Dica do dia</Text>
             </View>
             <Text style={styles.tipText}>
-              Crianças com TEA costumam responder melhor a rotinas previsíveis.
+              "{dailyTip}"
             </Text>
           </View>
 
@@ -216,6 +283,7 @@ export default function Home() {
 
             <TouchableOpacity
               style={[styles.gridSquare, { backgroundColor: "#bbdefb" }]}
+              onPress={() => router.push("/criar-rotina")}
             >
               <MaterialCommunityIcons
                 name="view-list"

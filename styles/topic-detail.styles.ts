@@ -100,7 +100,7 @@ export const styles = StyleSheet.create({
   instructionText: {
     color: '#ffffff',
     fontSize: 13,
-    marginLeft: 6,
+    marginLeft: 0,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
