@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../../styles/home.styles";
-import { generateCertificate } from "../../components/CertificateGenerator";
 
 // Lista de dicas focadas em Autismo
 const TIPS = [
@@ -66,13 +65,8 @@ export default function Home() {
     fetchUserAndProgress();
   }, []);
 
-  const handleDownloadCertificate = async () => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    try {
-      await generateCertificate(userName || "Estudante TEAC", today);
-    } catch (error) {
-      Alert.alert("Erro", "Não foi possível gerar o certificado. Verifique as permissões.");
-    }
+  const handleDownloadCertificate = () => {
+    router.push("/certificate");
   };
 
   const handleLogout = () => {

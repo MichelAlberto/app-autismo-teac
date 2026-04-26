@@ -1,145 +1,28 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState, useMemo } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/course.styles";
-
-interface Topic {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-interface CourseModule {
-  id: string;
-  title: string;
-  topics: Topic[];
-}
-
-const COURSE_DATA: CourseModule[] = [
-  {
-    id: "1",
-    title: "Módulo 1 - Introdução ao Autismo",
-    topics: [
-      {
-        id: "1-1",
-        title: "O que é o Transtorno do Espectro Autista (TEA)",
-        completed: false,
-      },
-      {
-        id: "1-2",
-        title: "Mitos e Verdades",
-        completed: false,
-      },
-      {
-        id: "1-3",
-        title: "Diversidade dentro do Espectro",
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: "2",
-    title: "Módulo 2 - Identificação e Sinais",
-    topics: [
-      {
-        id: "2-1",
-        title: "Sinais Precoces em Crianças",
-        completed: false,
-      },
-      {
-        id: "2-2",
-        title: "Diferenças entre Idades",
-        completed: false,
-      },
-      {
-        id: "2-3",
-        title: "Quando Procurar Ajuda",
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    title: "Módulo 3 - Comunicação e Comportamento",
-    topics: [
-      {
-        id: "3-1",
-        title: "Comunicação Verbal e Não-verbal",
-        completed: false,
-      },
-      {
-        id: "3-2",
-        title: "Crises (Meltdowns) vs Birras",
-        completed: false,
-      },
-      {
-        id: "3-3",
-        title: "Estratégias Práticas do Dia a Dia",
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: "4",
-    title: "Módulo 4 - Intervenções e Terapias",
-    topics: [
-      {
-        id: "4-1",
-        title: "ABA, Fonoaudiologia, Terapia Ocupacional",
-        completed: false,
-      },
-      {
-        id: "4-2",
-        title: "Como Escolher Abordagens",
-        completed: false,
-      },
-      {
-        id: "4-3",
-        title: "Papel da Família",
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: "5",
-    title: "Módulo 5 - Inclusão a Escola",
-    topics: [
-      {
-        id: "5-1",
-        title: "Adaptação Escolar",
-        completed: false,
-      },
-      {
-        id: "5-2",
-        title: "Direitos Legais (Importantes no Brasil)",
-        completed: false,
-      },
-      {
-        id: "5-3",
-        title: "Relação com Professores",
-        completed: false,
-      },
-    ],
-  },
-];
+import { COURSE_DATA, SLIDES_COUNT } from "../constants/courseData";
 
 export default function Course() {
-  const [completedTopics, setCompletedTopics] = useState<string[]>([]);
+  const [detailedProgress, setDetailedProgress] = useState<{ [key: string]: number[] }>({});
 
-  useEffect(() => {
-    loadProgress();
-  }, []);
+  // Recarregar progresso toda vez que a tela ganhar foco
+  useFocusEffect(
+    useCallback(() => {
+      loadProgress();
+    }, [])
+  );
 
   const loadProgress = async () => {
     try {
-      const progress = await AsyncStorage.getItem("course_progress");
-      if (progress) {
-        const completed = JSON.parse(progress);
-        setCompletedTopics(completed);
+      const data = await AsyncStorage.getItem("course_progress_detailed");
+      if (data) {
+        setDetailedProgress(JSON.parse(data));
       }
     } catch (error) {
       console.error("Erro ao carregar progresso:", error);
@@ -153,29 +36,27 @@ export default function Course() {
     });
   };
 
-  const markTopicAsCompleted = async (topicId: string) => {
-    if (!completedTopics.includes(topicId)) {
-      const updated = [...completedTopics, topicId];
-      setCompletedTopics(updated);
-      await AsyncStorage.setItem("course_progress", JSON.stringify(updated));
-    }
-  };
+  const progress = useMemo(() => {
+    let totalSlides = 0;
+    let totalRevealed = 0;
 
-  const calculateProgress = () => {
-    const totalTopics = COURSE_DATA.reduce(
-      (acc, module) => acc + module.topics.length,
-      0,
-    );
-    return totalTopics > 0
-      ? Math.round((completedTopics.length / totalTopics) * 100)
-      : 0;
-  };
+    COURSE_DATA.forEach(module => {
+      module.topics.forEach(topic => {
+        const count = SLIDES_COUNT[topic.id] || 5;
+        totalSlides += count;
+        const revealed = detailedProgress[topic.id] ? detailedProgress[topic.id].length : 0;
+        totalRevealed += revealed;
+      });
+    });
 
-  const handleGoBack = () => {
-    router.back();
-  };
+    return totalSlides > 0 ? Math.round((totalRevealed / totalSlides) * 100) : 0;
+  }, [detailedProgress]);
 
-  const progress = calculateProgress();
+  const isTopicCompleted = (topicId: string) => {
+    const revealedCount = detailedProgress[topicId] ? detailedProgress[topicId].length : 0;
+    const totalCount = SLIDES_COUNT[topicId] || 5;
+    return revealedCount >= totalCount;
+  };
 
   return (
     <LinearGradient
@@ -187,11 +68,11 @@ export default function Course() {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          {/* BANNER COM IMAGEM EM LARGURA TOTAL */}
+          {/* BANNER */}
           <View style={styles.bannerContainer}>
             <TouchableOpacity
               style={styles.backBtnOnBanner}
-              onPress={handleGoBack}
+              onPress={() => router.back()}
             >
               <Ionicons name="chevron-back" size={28} color="#ffffff" />
             </TouchableOpacity>
@@ -213,60 +94,90 @@ export default function Course() {
           </View>
 
           <View style={styles.courseCard}>
+            {/* BARRA DE PROGRESSO GLOBAL */}
             <View style={styles.progressCard}>
               <View style={styles.progressRow}>
                 <Text style={styles.progressPercentage}>{progress}%</Text>
                 <View style={styles.progressBarBg}>
                   <View
-                    style={[styles.progressBarFill, { width: `${progress}%` }]}
+                    style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: progress === 100 ? '#4CAF50' : '#3B82F6' }]}
                   />
                 </View>
               </View>
               <Text style={styles.moduleInfo}>
-                15 Tópicos em 5 Módulos - Conclua e receba um certificado!
+                {progress === 100 ? "Parabéns! Você concluiu o curso." : "Acompanhe seu progresso cartão a cartão!"}
               </Text>
+
+              {/* BOTÃO DE CERTIFICADO */}
+              <TouchableOpacity
+                style={[
+                  styles.certificateBtn,
+                  progress < 100 && styles.certificateBtnDisabled
+                ]}
+                onPress={() => progress === 100 && router.push("/certificate")}
+                activeOpacity={progress === 100 ? 0.7 : 1}
+              >
+                <Ionicons 
+                  name="ribbon-outline" 
+                  size={20} 
+                  color={progress === 100 ? "#ffffff" : "#A0AEC0"} 
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[
+                  styles.certificateBtnText,
+                  progress < 100 && styles.certificateBtnTextDisabled
+                ]}>
+                  Baixar Certificado Digital
+                </Text>
+                {progress < 100 && (
+                  <Ionicons name="lock-closed" size={14} color="#A0AEC0" style={{ marginLeft: 8 }} />
+                )}
+              </TouchableOpacity>
             </View>
 
             <View style={styles.topicsCard}>
               {COURSE_DATA.map((module) => (
                 <View key={module.id} style={styles.moduleSection}>
                   <Text style={styles.moduleTitle}>{module.title}</Text>
-                  {module.topics.map((topic, index) => (
-                    <React.Fragment key={topic.id}>
-                      <TouchableOpacity
-                        style={styles.topicItem}
-                        onPress={() => {
-                          markTopicAsCompleted(topic.id);
-                          handleTopicPress(topic.id, topic.title);
-                        }}
-                      >
-                        <View
-                          style={[
-                            styles.topicDot,
-                            completedTopics.includes(topic.id) &&
-                              styles.topicDotCompleted,
-                          ]}
-                        />
-                        <Text style={styles.topicText}>{topic.title}</Text>
-                      </TouchableOpacity>
-                      {index < module.topics.length - 1 && (
-                        <View style={styles.topicSeparator} />
-                      )}
-                    </React.Fragment>
-                  ))}
+                  {module.topics.map((topic, index) => {
+                    const completed = isTopicCompleted(topic.id);
+                    return (
+                      <React.Fragment key={topic.id}>
+                        <TouchableOpacity
+                          style={styles.topicItem}
+                          onPress={() => handleTopicPress(topic.id, topic.title)}
+                        >
+                          <View
+                            style={[
+                              styles.topicDot,
+                              completed && styles.topicDotCompleted,
+                            ]}
+                          >
+                            {completed && <Ionicons name="checkmark" size={12} color="#ffffff" />}
+                          </View>
+                          <Text style={[styles.topicText, completed && { color: '#4CAF50', fontWeight: '600' }]}>
+                            {topic.title}
+                          </Text>
+                        </TouchableOpacity>
+                        {index < module.topics.length - 1 && (
+                          <View style={styles.topicSeparator} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </View>
               ))}
             </View>
           </View>
 
-          {/* CARD "PRECISA DE AJUDA?" */}
+          {/* CARD AJUDA */}
           <View style={styles.helpCard}>
             <View style={styles.helpHeader}>
               <Ionicons name="help-circle" size={24} color="#64b5f6" />
               <Text style={styles.helpTitle}>Precisa de ajuda?</Text>
             </View>
             <Text style={styles.helpText}>
-              Envie sua dúvida no Fórum Cen...
+              Envie sua dúvida no Fórum da Comunidade.
             </Text>
             <TouchableOpacity
               style={styles.forumBtn}
