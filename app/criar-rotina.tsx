@@ -42,12 +42,31 @@ const ICON_OPTIONS = [
   { name: "water", type: "Ionicons", color: "#4FC3F7" },
 ];
 
+// IMPORT FIREBASE
+import { db } from "./firebaseConfig";
+import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+
+import Toast from "../components/Toast";
+
 export default function CriarRotina() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState(false); 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
+  // Estados do Toast
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error" | "info">("info");
+
+  const showToast = (msg: string, type: "success" | "error" | "info") => {
+    setToastMessage(msg);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [selectedIcon, setSelectedIcon] = useState(ICON_OPTIONS[0]);
@@ -57,18 +76,43 @@ export default function CriarRotina() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   React.useEffect(() => {
-    const loadTasks = async () => {
-      try {
-        const existing = await AsyncStorage.getItem("teac_rotinas_lista");
-        if (existing) {
-          setTasks(JSON.parse(existing));
-        }
-      } catch (e) {
-        console.error("Erro ao carregar rotinas:", e);
-      }
-    };
     loadTasks();
   }, []);
+
+  const loadTasks = async () => {
+    setLoading(true);
+    try {
+      // 1. Pegar usuário logado
+      const userJson = await AsyncStorage.getItem("teac_current_user");
+      if (!userJson) return;
+      const user = JSON.parse(userJson);
+      setCurrentUser(user);
+
+      // 2. Tentar buscar da nuvem (Firestore)
+      const q = query(
+        collection(db, "users", user.uid, "rotinas"), 
+        orderBy("createdAt", "desc")
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const docs: any[] = [];
+      querySnapshot.forEach((doc) => {
+        docs.push({ id: doc.id, ...doc.data() });
+      });
+
+      setTasks(docs);
+
+      // 3. Cache local opcional
+      await AsyncStorage.setItem("teac_rotinas_lista", JSON.stringify(docs));
+    } catch (e) {
+      console.error("Erro ao carregar rotinas:", e);
+      // Fallback para local se offline
+      const existing = await AsyncStorage.getItem("teac_rotinas_lista");
+      if (existing) setTasks(JSON.parse(existing));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openAddModal = () => {
     setViewMode(false);
@@ -85,46 +129,64 @@ export default function CriarRotina() {
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) {
-      Alert.alert("Erro", "Dê um nome para a tarefa.");
+      showToast("Dê um nome para a tarefa.", "error");
       return;
     }
 
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: newTaskTitle,
-      description: newTaskDesc,
-      time: taskTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      date: taskDate.toLocaleDateString("pt-BR"),
-      icon: selectedIcon.name,
-      iconType: selectedIcon.type as any,
-      color: selectedIcon.color,
-    };
+    if (!currentUser) return;
 
-    const updatedTasks = [newTask, ...tasks];
-    setTasks(updatedTasks);
-
+    setLoading(true);
     try {
-      await AsyncStorage.setItem("teac_rotinas_lista", JSON.stringify(updatedTasks));
+      const newTask = {
+        title: newTaskTitle,
+        description: newTaskDesc,
+        time: taskTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        date: taskDate.toLocaleDateString("pt-BR"),
+        icon: selectedIcon.name,
+        iconType: selectedIcon.type,
+        color: selectedIcon.color,
+        createdAt: new Date().toISOString()
+      };
+
+      // Salvar na nuvem
+      await addDoc(collection(db, "users", currentUser.uid, "rotinas"), newTask);
+      
       setModalVisible(false);
-    } catch (e) {
-      Alert.alert("Erro", "Não foi possível salvar a atividade.");
+      showToast("Rotina salva com sucesso!", "success");
+      loadTasks(); // Recarregar lista
+    } catch (e: any) {
+      console.error("ERRO AO SALVAR NO FIREBASE:", e);
+      showToast("Erro ao salvar: " + e.message, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   const removeTaskFromDetail = async () => {
-    if (!selectedTask) return;
-    const updatedTasks = tasks.filter(t => t.id !== selectedTask.id);
-    setTasks(updatedTasks);
+    if (!selectedTask || !currentUser) return;
+    
+    setLoading(true);
     try {
-      await AsyncStorage.setItem("teac_rotinas_lista", JSON.stringify(updatedTasks));
+      await deleteDoc(doc(db, "users", currentUser.uid, "rotinas", selectedTask.id));
       setModalVisible(false);
-    } catch (e) {
+      showToast("Rotina excluída.", "info");
+      loadTasks();
+    } catch (e: any) {
       console.error("Erro ao remover:", e);
+      showToast("Erro ao excluir: " + e.message, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <LinearGradient colors={["#e6f5f9", "#e0eaf5", "#dce0f2"]} style={{ flex: 1 }}>
+      <Toast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>

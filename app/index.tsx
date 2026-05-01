@@ -4,17 +4,24 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { styles } from "../styles/index.styles";
+
+// IMPORTES DO FIREBASE
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "./firebaseConfig";
+
+import Toast from "../components/Toast";
 
 export default function Index() {
   const [email, setEmail] = useState("");
@@ -22,14 +29,30 @@ export default function Index() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Estados do Toast
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error" | "info">("info");
+
+  const showToast = (msg: string, type: "success" | "error" | "info") => {
+    setToastMessage(msg);
+    setToastType(type);
+    setToastVisible(true);
+  };
 
   useEffect(() => {
     const init = async () => {
-      const seen = await AsyncStorage.getItem("hasSeenIntro");
-      if (seen) {
-        setShowLogin(true);
-      } else {
-        router.replace("/slides");
+      try {
+        const seen = await AsyncStorage.getItem("hasSeenIntro");
+        if (seen === "true") {
+          setShowLogin(true);
+        } else {
+          router.replace("/slides");
+        }
+      } catch (e) {
+        setShowLogin(true); // Fallback caso ocorra erro na leitura
       }
     };
     init();
@@ -38,64 +61,68 @@ export default function Index() {
   if (!showLogin) return null;
 
   const handleLogin = async () => {
-    setErrorMsg(""); // Limpa mensagens anteriores
+    setErrorMsg("");
 
     if (!email || !senha) {
       setErrorMsg("Preencha o e-mail e a senha.");
       return;
     }
 
-    // CONTA MESTRE DO ADMINISTRADOR: Invade o sistema diretamente
-    if (email.toLowerCase() === "admin" && senha === "admin") {
-      const adminUser = { nome: "Supervisor", email: "admin", isAdmin: true };
-      await AsyncStorage.setItem(
-        "teac_current_user",
-        JSON.stringify(adminUser),
-      );
-      router.push("/(tabs)/home");
-      return;
-    }
+    setLoading(true);
 
     try {
-      const usersJson = await AsyncStorage.getItem("teac_users");
-      const users = usersJson ? JSON.parse(usersJson) : [];
+      // 1. Autenticar com Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), senha);
+      const user = userCredential.user;
 
-      const validUser = users.find(
-        (u: any) =>
-          u.email.toLowerCase() === email.toLowerCase() && u.senha === senha,
-      );
+      // 2. Buscar dados adicionais no Firestore (Nome e isAdmin)
+      const userDoc = await getDoc(doc(db, "users", user.uid));
 
-      if (validUser) {
-        // Sucesso (Avança para a home)
-        await AsyncStorage.setItem(
-          "teac_current_user",
-          JSON.stringify(validUser),
-        );
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+
+        // 3. Salvar na sessão local para manter compatibilidade com o resto do app
+        const currentUser = {
+          uid: user.uid,
+          nome: userData.nome,
+          email: user.email,
+          isAdmin: userData.isAdmin || false
+        };
+
+        await AsyncStorage.setItem("teac_current_user", JSON.stringify(currentUser));
+
+        // 4. Ir para Home
         router.push("/(tabs)/home");
       } else {
-        setErrorMsg("E-mail ou senha incorretos.");
+        setErrorMsg("Usuário autenticado, mas dados não encontrados no banco.");
       }
-    } catch (error) {
-      setErrorMsg("Ocorreu um erro ao tentar entrar. Tente novamente.");
+
+    } catch (error: any) {
+      console.error("ERRO AO LOGAR:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setErrorMsg("E-mail ou senha incorretos.");
+      } else if (error.code === 'auth/invalid-email') {
+        setErrorMsg("Formato de e-mail inválido.");
+      } else {
+        setErrorMsg("Erro ao entrar: " + error.message);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    await AsyncStorage.setItem(
-      "teac_current_user",
-      JSON.stringify({
-        nome: "Usuário Google",
-        email: "google@test.com",
-        isAdmin: false,
-      }),
-    );
-    Alert.alert("Sucesso", "Login com Google efetuado com sucesso (offline)!", [
-      { text: "OK", onPress: () => router.push("/(tabs)/home") },
-    ]);
+    showToast("Login com Google requer configurações adicionais.", "info");
   };
 
   return (
     <LinearGradient colors={["#c2f0f7", "#f7c2e0"]} style={{ flex: 1 }}>
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        onHide={() => setToastVisible(false)}
+      />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -105,7 +132,7 @@ export default function Index() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Bem-vindo ao TEAC</Text>
+          <Text style={styles.title}>Seja Bem-vindo</Text>
           <Text style={styles.subtitle}>Aprenda e Conecte-se</Text>
 
           <Image source={require("../assets/logo1.png")} style={styles.image} />
@@ -113,7 +140,6 @@ export default function Index() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Entre na sua Conta</Text>
 
-            {/* INPUT EMAIL */}
             <TextInput
               placeholder="Email"
               style={styles.input}
@@ -121,9 +147,9 @@ export default function Index() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!loading}
             />
 
-            {/* INPUT SENHA */}
             <View style={styles.passwordContainer}>
               <TextInput
                 placeholder="Senha"
@@ -131,10 +157,12 @@ export default function Index() {
                 style={styles.passwordInput}
                 value={senha}
                 onChangeText={setSenha}
+                editable={!loading}
               />
               <TouchableOpacity
                 style={styles.eyeIcon}
                 onPress={() => setShowPassword(!showPassword)}
+                disabled={loading}
               >
                 <Ionicons
                   name={showPassword ? "eye-off" : "eye"}
@@ -147,43 +175,44 @@ export default function Index() {
             <TouchableOpacity
               onPress={() => router.push("/recuperacao-senha")}
               style={styles.forgotBtn}
+              disabled={loading}
             >
               <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
 
-            {/* MENSAGEM DE ERRO VISUAL */}
-            {errorMsg !== "" && (
-              <Text style={styles.errorText}>{errorMsg}</Text>
-            )}
+            {errorMsg !== "" && <Text style={styles.errorText}>{errorMsg}</Text>}
 
-            {/* BOTÃO LOGIN */}
-            <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-              <Text style={styles.loginText}>Entrar</Text>
+            <TouchableOpacity
+              style={[styles.loginBtn, loading && { opacity: 0.7 }]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.loginText}>Entrar</Text>}
             </TouchableOpacity>
 
-            {/* BOTÃO CADASTRO */}
             <TouchableOpacity
               style={styles.registerBtn}
               onPress={() => router.push("/cadastro")}
+              disabled={loading}
             >
               <Text style={styles.registerText}>Criar conta</Text>
             </TouchableOpacity>
 
-            {/* GOOGLE */}
             <TouchableOpacity
               style={styles.googleBtn}
               onPress={handleGoogleLogin}
+              disabled={loading}
             >
               <Text>Entrar com Google</Text>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.footer}>
-            Ao clicar em continuar, você concorda com os nossos Termos de
-            Serviço e com a Política de Privacidade
+            © 2026 TEAC. Capacitando e Ensinando Pessoas Sobre o Transtorno do Espectro Autista.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
+

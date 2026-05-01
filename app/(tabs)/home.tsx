@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../../styles/home.styles";
+import { TOPIC_CONTENT } from "../../constants/topicContent";
 
 // Lista de dicas focadas em Autismo
 const TIPS = [
@@ -30,9 +31,12 @@ const TIPS = [
   "A paciência é a maior ferramenta de ensino que você possui."
 ];
 
+import MenuLateral from "../../components/MenuLateral";
+
 export default function Home() {
   const [userName, setUserName] = useState("");
   const [isCourseComplete, setIsCourseComplete] = useState(false);
+  const [isCourseStarted, setIsCourseStarted] = useState(false);
   const [dailyTip, setDailyTip] = useState("");
 
   useEffect(() => {
@@ -49,12 +53,32 @@ export default function Home() {
           setUserName(user.isAdmin ? "ADMINISTRADOR" : user.nome);
         }
 
-        // Busca Progresso do Curso
-        const progress = await AsyncStorage.getItem("course_progress");
-        if (progress) {
-          const completed = JSON.parse(progress);
+        // Busca Progresso do Curso (Lista de IDs concluídos)
+        const progressJson = await AsyncStorage.getItem("course_progress_detailed");
+        if (progressJson) {
+          const progressData = JSON.parse(progressJson);
+          
+          let fullyCompletedTopicsCount = 0;
+          let startedTopicsCount = 0;
+
+          Object.keys(progressData).forEach((topicId) => {
+            const revealedSlides = progressData[topicId].length;
+            const totalSlides = TOPIC_CONTENT[topicId] ? TOPIC_CONTENT[topicId].length : 5;
+            
+            if (revealedSlides > 0) {
+              startedTopicsCount++;
+            }
+            if (revealedSlides >= totalSlides) {
+              fullyCompletedTopicsCount++;
+            }
+          });
+
+          if (startedTopicsCount > 0) {
+            setIsCourseStarted(true);
+          }
+
           // O curso tem 15 tópicos no total (5 módulos x 3 tópicos)
-          if (completed.length >= 15) {
+          if (fullyCompletedTopicsCount >= 15) {
             setIsCourseComplete(true);
           }
         }
@@ -64,24 +88,6 @@ export default function Home() {
     };
     fetchUserAndProgress();
   }, []);
-
-  const handleDownloadCertificate = () => {
-    router.push("/certificate");
-  };
-
-  const handleLogout = () => {
-    Alert.alert("Sair", "Tem certeza que deseja deslogar e voltar ao início?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem("teac_current_user");
-          router.replace("/");
-        },
-      },
-    ]);
-  };
 
   return (
     <LinearGradient
@@ -94,18 +100,23 @@ export default function Home() {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={28} color="#e53935" />
-          </TouchableOpacity>
-
-          {/* SAUDAÇÃO INICIAL */}
-          <View style={styles.greetingHeader}>
-            <Text style={styles.greetingTitle}>
-              Bem-vindo de volta{userName ? `, ${userName}` : ""}!
-            </Text>
-            <Text style={styles.greetingSubtitle}>
-              Continue a jornada de aprendizado.
-            </Text>
+          {/* CABEÇALHO PADRONIZADO (IGUAL AO FÓRUM) */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            paddingHorizontal: 20, 
+            paddingTop: 10,
+            paddingBottom: 10
+          }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1a3b5c' }}>
+                Bem-vindo{userName ? `, ${userName}` : ""}!
+              </Text>
+              <Text style={{ fontSize: 14, color: '#64748b' }}>
+                Continue a jornada de aprendizado.
+              </Text>
+            </View>
+            <MenuLateral />
           </View>
 
           {/* CARD 1: COMECE SUA JORNADA */}
@@ -145,20 +156,14 @@ export default function Home() {
                 onPress={() => router.push("/course")}
               >
                 <Text style={styles.iniciarCursoBtnText}>
-                  {isCourseComplete ? "Rever Curso" : "Iniciar Curso"}
+                  {isCourseComplete 
+                    ? "Rever Curso" 
+                    : isCourseStarted 
+                      ? "Continuar Curso" 
+                      : "Iniciar Curso"}
                 </Text>
                 <Ionicons name="chevron-forward" size={18} color="#ffffff" />
               </TouchableOpacity>
-
-              {isCourseComplete && (
-                <TouchableOpacity
-                  style={[styles.iniciarCursoBtn, { backgroundColor: '#4caf50' }]}
-                  onPress={handleDownloadCertificate}
-                >
-                  <Text style={styles.iniciarCursoBtnText}>Certificado</Text>
-                  <Ionicons name="ribbon-outline" size={18} color="#ffffff" />
-                </TouchableOpacity>
-              )}
             </View>
 
             {/* Imagem Flutuante na Direita */}

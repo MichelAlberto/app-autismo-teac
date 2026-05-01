@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
+  useWindowDimensions,
   FlatList, Image, StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,15 +12,12 @@ import {
   ViewToken
 } from "react-native";
 
-// Dimensões da TELA (screen) em vez de window para pegar a área total (incluindo barras)
-const { width, height } = Dimensions.get("screen");
-
 // Interface para os slides
 interface Slide {
   id: string;
   title: string;
   description: string;
-  icon: any;
+  image: any;
 }
 
 // Slides atualizados com as novas imagens e frases originais
@@ -30,26 +27,27 @@ const SLIDES: Slide[] = [
     title: "Bem-vindo ao TEAC!",
     description:
       "Um espaço de apoio, aprendizado e conexão para autistas, familiares e profissionais.",
-    icon: require("../assets/pnghome1.png"),
+    image: require("../assets/int1.png"),
   },
   {
     id: "2",
     title: "Fórum e Comunidade",
     description:
       "Tire suas dúvidas e converse com outras pessoas que compartilham da mesma vivência.",
-    icon: require("../assets/pnghome2.png"),
+    image: require("../assets/int2.png"),
   },
   {
     id: "3",
     title: "Pronto para Começar?",
     description:
       "Encontre profissionais qualificados para te guiar e acesse todos os recursos agora mesmo!",
-    icon: require("../assets/pnghome3.png"),
+    image: require("../assets/int3.png"),
   },
 ];
 
 export default function SlidesApresentacao() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
   const slidesRef = useRef<FlatList<Slide>>(null);
@@ -71,7 +69,9 @@ export default function SlidesApresentacao() {
   // Vai para o próximo slide
   const nextSlide = async () => {
     if (currentIndex < SLIDES.length - 1) {
-      slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
+      const nextIndex = currentIndex + 1;
+      slidesRef.current?.scrollToOffset({ offset: nextIndex * width, animated: true });
+      setCurrentIndex(nextIndex); // Atualização otimista
     } else {
       await AsyncStorage.setItem("hasSeenIntro", "true");
       router.replace("/"); // Vai para o Login
@@ -80,12 +80,10 @@ export default function SlidesApresentacao() {
 
   const renderItem = ({ item }: { item: Slide }) => {
     return (
-      <View style={styles.slideContainer}>
-        {/* Overlay opcional para garantir leitura */}
-        <View style={styles.overlay} />
+      <View style={[styles.slideContainer, { width, height }]}>
+        <Image source={item.image} style={[StyleSheet.absoluteFillObject, { width, height }]} resizeMode="stretch" />
 
         <View style={styles.contentContainer}>
-          <Image source={item.icon} style={styles.iconImage} resizeMode="contain" />
           <View style={styles.textContainer}>
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.description}>{item.description}</Text>
@@ -99,12 +97,6 @@ export default function SlidesApresentacao() {
     <View style={styles.container}>
       {/* Força o conteúdo a ficar por baixo da barra de status */}
       <StatusBar translucent backgroundColor="transparent" style="light" />
-      
-      <Image 
-        source={require("../assets/fundo.png")} 
-        style={styles.backgroundImage} 
-        resizeMode="cover" 
-      />
 
       <FlatList
         data={SLIDES}
@@ -114,6 +106,11 @@ export default function SlidesApresentacao() {
         pagingEnabled
         bounces={false}
         keyExtractor={(item) => item.id}
+        getItemLayout={(data, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+        })}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           {
@@ -163,24 +160,16 @@ export default function SlidesApresentacao() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#FFF",
   },
   backgroundImage: {
     position: "absolute",
     top: 0,
     left: 0,
-    width: width,
-    height: height,
   },
   slideContainer: {
-    width,
-    height,
     alignItems: "center",
     justifyContent: "center",
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.25)", // Overlay leve para ajudar na leitura
   },
   contentContainer: {
     flex: 1,
@@ -188,37 +177,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 30,
-    paddingTop: 50,
-  },
-  iconImage: {
-    width: width * 0.9,
-    height: height * 0.45,
-    marginBottom: 20,
   },
   textContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingBottom: 100, // Espaço para o rodapé
   },
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: "#0D1B3E",
     textAlign: "center",
     marginBottom: 15,
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   description: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#FFFFFF",
+    color: "#4A5568",
     textAlign: "center",
     lineHeight: 24,
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   footer: {
     position: "absolute",

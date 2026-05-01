@@ -122,7 +122,7 @@ export const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   footer: {
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 10,
     textAlign: 'center',
   },

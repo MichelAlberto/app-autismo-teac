@@ -14,19 +14,47 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/comportamento.styles";
 
+// IMPORT FIREBASE
+import { db } from "./firebaseConfig";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+
 export default function Relatorios() {
   const [reports, setReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const loadReports = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await AsyncStorage.getItem('teac_behavior_reports');
-      if (data) {
-        setReports(JSON.parse(data));
-      }
+      // 1. Pegar usuário logado
+      const userJson = await AsyncStorage.getItem("teac_current_user");
+      if (!userJson) return;
+      const user = JSON.parse(userJson);
+
+      // 2. Buscar da nuvem
+      const q = query(
+        collection(db, "users", user.uid, "comportamentos"), 
+        orderBy("createdAt", "desc")
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const docs: any[] = [];
+      querySnapshot.forEach((doc) => {
+        docs.push({ id: doc.id, ...doc.data() });
+      });
+
+      setReports(docs);
+
+      // 3. Cache local opcional
+      await AsyncStorage.setItem('teac_behavior_reports', JSON.stringify(docs));
     } catch (e) {
-      console.error(e);
+      console.error("Erro ao carregar relatórios:", e);
+      // Fallback para local
+      const data = await AsyncStorage.getItem('teac_behavior_reports');
+      if (data) setReports(JSON.parse(data));
+    } finally {
+      setLoading(false);
     }
   }, []);
 

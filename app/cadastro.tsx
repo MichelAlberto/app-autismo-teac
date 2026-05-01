@@ -10,9 +10,14 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { styles } from '../styles/cadastro.styles';
+
+// IMPORTES DO FIREBASE
+import { auth, db } from './firebaseConfig';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function Register() {
   const [nome, setNome] = useState('');
@@ -21,6 +26,7 @@ export default function Register() {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     setErrorMsg('');
@@ -36,35 +42,47 @@ export default function Register() {
       return;
     }
 
+    if (senha.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      // Puxar os usuários existentes
-      const usersJson = await AsyncStorage.getItem('teac_users');
-      const users = usersJson ? JSON.parse(usersJson) : [];
+      // 1. Criar o usuário no Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), senha);
+      const user = userCredential.user;
 
-      // Verificar se o e-mail já existe
-      const userExists = users.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
-      if (userExists) {
-        setErrorMsg('Este e-mail já está cadastrado.');
-        return;
-      }
+      // 2. Definir se é administrador (Email específico)
+      const isAdmin = email.toLowerCase().trim() === 'admin@teac.com';
+
+      // 3. Salvar os dados complementares no Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        nome: nome,
+        email: email.toLowerCase().trim(),
+        isAdmin: isAdmin,
+        createdAt: new Date().toISOString()
+      });
+
+      setSuccessMsg('Conta criada com sucesso!');
       
-      // Adicionar novo usuário (Contas novas sempre nascem como usuário comum)
-      const newUser = { nome, email, senha, isAdmin: false };
-      users.push(newUser);
-
-      // Salvar de volta no storage (offline)
-      await AsyncStorage.setItem('teac_users', JSON.stringify(users));
-
-      setSuccessMsg('Conta salva com sucesso! Voltando...');
-      
-      // Espera 2 segundos para o cliente ler a mensagem e depois volta
       setTimeout(() => {
-        router.back();
+        router.replace('/'); 
       }, 2000);
       
     } catch (error: any) {
-      console.error("ERRO COMPLETO:", error);
-      setErrorMsg('Erro interno: ' + (error?.message || 'Desconhecido'));
+      console.error("ERRO AO CADASTRAR:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        setErrorMsg('Este e-mail já está em uso.');
+      } else if (error.code === 'auth/invalid-email') {
+        setErrorMsg('E-mail inválido.');
+      } else {
+        setErrorMsg('Erro ao cadastrar: ' + error.message);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,78 +101,79 @@ export default function Register() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.brandTitle}>Bem-vindo ao TEAC</Text>
-      <Text style={styles.subtitle}>Aprenda e Conecte-se</Text>
+          <Text style={styles.subtitle}>Aprenda e Conecte-se</Text>
 
-      <Image
-        source={require('../assets/logo1.png')}
-        style={styles.image}
-      />
+          <Image
+            source={require('../assets/logo1.png')}
+            style={styles.image}
+          />
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Crie sua Conta</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Crie sua Conta</Text>
 
-        {/* INPUT NOME */}
-        <TextInput
-          placeholder="Nome completo"
-          style={styles.input}
-          value={nome}
-          onChangeText={setNome}
-        />
+            <TextInput
+              placeholder="Nome completo"
+              style={styles.input}
+              value={nome}
+              onChangeText={setNome}
+              editable={!loading}
+            />
 
-        {/* INPUT EMAIL */}
-        <TextInput
-          placeholder="Email"
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+            <TextInput
+              placeholder="Email"
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={!loading}
+            />
 
-        {/* INPUT SENHA */}
-        <TextInput
-          placeholder="Senha"
-          secureTextEntry
-          style={styles.input}
-          value={senha}
-          onChangeText={setSenha}
-        />
+            <TextInput
+              placeholder="Senha (mín. 6 caracteres)"
+              secureTextEntry
+              style={styles.input}
+              value={senha}
+              onChangeText={setSenha}
+              editable={!loading}
+            />
 
-        {/* INPUT CONFIRMAR SENHA */}
-        <TextInput
-          placeholder="Confirmar Senha"
-          secureTextEntry
-          style={styles.input}
-          value={confirmarSenha}
-          onChangeText={setConfirmarSenha}
-        />
+            <TextInput
+              placeholder="Confirmar Senha"
+              secureTextEntry
+              style={styles.input}
+              value={confirmarSenha}
+              onChangeText={setConfirmarSenha}
+              editable={!loading}
+            />
 
-        {/* MENSAGEM DE ERRO VISUAL */}
-        {errorMsg !== '' && (
-          <Text style={styles.errorText}>{errorMsg}</Text>
-        )}
+            {errorMsg !== '' && <Text style={styles.errorText}>{errorMsg}</Text>}
+            {successMsg !== '' && <Text style={styles.successText}>{successMsg}</Text>}
 
-        {/* MENSAGEM DE SUCESSO VISUAL */}
-        {successMsg !== '' && (
-          <Text style={styles.successText}>{successMsg}</Text>
-        )}
+            <TouchableOpacity
+              style={[styles.registerBtn, loading && { opacity: 0.7 }]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.registerText}>Cadastrar</Text>
+              )}
+            </TouchableOpacity>
 
-        {/* BOTÃO CADASTRAR */}
-        <TouchableOpacity
-          style={styles.registerBtn}
-          onPress={handleRegister}
-        >
-          <Text style={styles.registerText}>Cadastrar</Text>
-        </TouchableOpacity>
-
-        {/* BOTÃO VOLTAR */}
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>Já tenho uma conta (Voltar)</Text>
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity 
+              style={styles.backBtn} 
+              onPress={() => router.back()}
+              disabled={loading}
+            >
+              <Text style={styles.backText}>Já tenho uma conta (Voltar)</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
+
 

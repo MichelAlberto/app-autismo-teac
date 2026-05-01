@@ -11,6 +11,7 @@ import {
   StatusBar,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,9 +19,9 @@ import { styles } from "../styles/topic-detail.styles";
 import { TOPIC_CONTENT } from "../constants/topicContent";
 import { TOTAL_COURSE_SLIDES } from "../constants/courseData";
 
-const { width: screenWidth } = Dimensions.get("window");
+// Removed global screenWidth to use useWindowDimensions
 
-const FlipCard = memo(({ item, initiallyRevealed, onReveal }: any) => {
+const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenHeight }: any) => {
   const animatedValue = useRef(new Animated.Value(initiallyRevealed ? 180 : 0)).current;
   const [isFlipped, setIsFlipped] = useState(initiallyRevealed);
 
@@ -57,8 +58,8 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal }: any) => {
   });
 
   return (
-    <View style={styles.slideWrapper}>
-      <View style={styles.card}>
+    <View style={[styles.slideWrapper, { width: screenWidth }]}>
+      <View style={[styles.card, { width: screenWidth * 0.88, height: screenHeight * 0.52 }]}>
         <Animated.View
           pointerEvents={isFlipped ? "none" : "auto"}
           style={[
@@ -141,11 +142,18 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal }: any) => {
   );
 });
 
+// IMPORT FIREBASE
+import { db } from "./firebaseConfig";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+
 export default function TopicDetail() {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { topicId, topicTitle } = useLocalSearchParams();
   const [revealedSlides, setRevealedSlides] = useState<Set<number>>(new Set());
   const [currentSlide, setCurrentSlide] = useState(0);
   const [globalProgress, setGlobalProgress] = useState(0);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [fullCourseProgress, setFullCourseProgress] = useState<any>({});
 
   const flatListRef = useRef<FlatList>(null);
   
@@ -158,37 +166,69 @@ export default function TopicDetail() {
 
   const loadTopicProgress = async () => {
     try {
-      const data = await AsyncStorage.getItem("course_progress_detailed");
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (parsed[topicId as string]) {
-          const revealed = new Set<number>(parsed[topicId as string]);
-          setRevealedSlides(revealed);
-          if (revealed.size === totalSlides);
-        }
+      // 1. Pegar usuário logado
+      const userJson = await AsyncStorage.getItem("teac_current_user");
+      if (!userJson) return;
+      const user = JSON.parse(userJson);
+      setCurrentUser(user);
 
-        let totalRevealed = 0;
-        Object.keys(parsed).forEach(id => {
-          totalRevealed += parsed[id].length;
-        });
-        setGlobalProgress(Math.round((totalRevealed / TOTAL_COURSE_SLIDES) * 100));
+      // 2. Tentar buscar progresso do Firestore primeiro (Nuvem)
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      let cloudProgress = {};
+      if (userDoc.exists()) {
+        cloudProgress = userDoc.data().courseProgress || {};
       }
-    } catch (e) { console.error(e); }
+
+      // 3. Buscar progresso local (Fallback/Cache)
+      const localData = await AsyncStorage.getItem("course_progress_detailed");
+      const localProgress = localData ? JSON.parse(localData) : {};
+
+      // Mesclar os dois (prioridade para a nuvem se existir)
+      const combinedProgress = { ...localProgress, ...cloudProgress };
+      setFullCourseProgress(combinedProgress);
+      
+      if (combinedProgress[topicId as string]) {
+        setRevealedSlides(new Set<number>(combinedProgress[topicId as string]));
+      }
+
+      calculateGlobalProgress(combinedProgress);
+    } catch (e) { console.error("Erro ao carregar progresso:", e); }
+  };
+
+  const calculateGlobalProgress = (progressObj: any) => {
+    // Calculando a quantidade real de slides disponíveis em todo o curso dinamicamente
+    let totalSlidesGlobal = 0;
+    Object.keys(TOPIC_CONTENT).forEach(key => {
+      totalSlidesGlobal += TOPIC_CONTENT[key].length;
+    });
+
+    let totalRevealed = 0;
+    Object.keys(progressObj).forEach(id => {
+      totalRevealed += progressObj[id].length;
+    });
+
+    setGlobalProgress(totalSlidesGlobal > 0 ? Math.round((totalRevealed / totalSlidesGlobal) * 100) : 0);
   };
 
   const saveTopicProgress = async (updatedRevealed: Set<number>) => {
     try {
-      const data = await AsyncStorage.getItem("course_progress_detailed");
-      const parsed = data ? JSON.parse(data) : {};
-      parsed[topicId as string] = Array.from(updatedRevealed);
-      await AsyncStorage.setItem("course_progress_detailed", JSON.stringify(parsed));
+      if (!currentUser) return;
 
-      let totalRevealed = 0;
-      Object.keys(parsed).forEach(id => {
-        totalRevealed += parsed[id].length;
-      });
-      setGlobalProgress(Math.round((totalRevealed / TOTAL_COURSE_SLIDES) * 100));
-    } catch (e) { console.error(e); }
+      // Mantém a sincronia exata de todo o curso
+      const newFullProgress = { ...fullCourseProgress };
+      newFullProgress[topicId as string] = Array.from(updatedRevealed);
+      setFullCourseProgress(newFullProgress);
+
+      // 1. Salvar Localmente
+      await AsyncStorage.setItem("course_progress_detailed", JSON.stringify(newFullProgress));
+
+      // 2. Salvar no Firestore (Nuvem)
+      await setDoc(doc(db, "users", currentUser.uid), {
+        courseProgress: newFullProgress
+      }, { merge: true });
+
+      calculateGlobalProgress(newFullProgress);
+    } catch (e) { console.error("Erro ao salvar progresso:", e); }
   };
 
   const onCardReveal = (index: number) => {
@@ -212,7 +252,7 @@ export default function TopicDetail() {
     if (currentSlide < totalSlides - 1) {
       const nextIndex = currentSlide + 1;
       setCurrentSlide(nextIndex);
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      flatListRef.current?.scrollToOffset({ offset: nextIndex * screenWidth, animated: true });
     }
   };
 
@@ -220,7 +260,7 @@ export default function TopicDetail() {
     if (currentSlide > 0) {
       const prevIndex = currentSlide - 1;
       setCurrentSlide(prevIndex);
-      flatListRef.current?.scrollToIndex({ index: prevIndex, animated: true });
+      flatListRef.current?.scrollToOffset({ offset: prevIndex * screenWidth, animated: true });
     }
   };
 
@@ -230,6 +270,8 @@ export default function TopicDetail() {
         item={item}
         initiallyRevealed={revealedSlides.has(index)}
         onReveal={() => onCardReveal(index)}
+        screenWidth={screenWidth}
+        screenHeight={screenHeight}
       />
     );
   };
@@ -254,6 +296,11 @@ export default function TopicDetail() {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            getItemLayout={(data, index) => ({
+              length: screenWidth,
+              offset: screenWidth * index,
+              index,
+            })}
             onScroll={onScroll}
             scrollEventThrottle={16}
             keyExtractor={(_, index) => index.toString()}

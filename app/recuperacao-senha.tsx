@@ -1,152 +1,114 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { auth } from './firebaseConfig';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
 import { styles } from '../styles/recuperacao-senha.styles';
 
 export default function ForgotPassword() {
-  const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleVerifyEmail = async () => {
+  const handleSendResetEmail = async () => {
     setErrorMsg('');
-    if (!email) {
-      setErrorMsg('Preencha o e-mail.');
+    setSuccessMsg('');
+    
+    const cleanEmail = email.trim().toLowerCase();
+    
+    if (!cleanEmail) {
+      setErrorMsg('Por favor, digite seu e-mail.');
       return;
     }
 
+    setLoading(true);
     try {
-      const usersJson = await AsyncStorage.getItem('teac_users');
-      const users = usersJson ? JSON.parse(usersJson) : [];
-
-      const userExists = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-
-      if (userExists) {
-        setStep(2);
-      } else {
-        setErrorMsg('E-mail não encontrado no sistema.');
-      }
-    } catch (error) {
-      setErrorMsg('Erro ao verificar e-mail.');
-    }
-  };
-
-  const handleResetPassword = async () => {
-    setErrorMsg('');
-    if (!newPassword) {
-      setErrorMsg('Preencha a nova senha.');
-      return;
-    }
-
-    try {
-      const usersJson = await AsyncStorage.getItem('teac_users');
-      let users = usersJson ? JSON.parse(usersJson) : [];
-
-      users = users.map((u: any) => {
-        if (u.email.toLowerCase() === email.toLowerCase()) {
-          return { ...u, senha: newPassword };
-        }
-        return u;
-      });
-
-      await AsyncStorage.setItem('teac_users', JSON.stringify(users));
-
-      setSuccessMsg('Senha atualizada com sucesso! Voltando...');
+      await sendPasswordResetEmail(auth, cleanEmail);
+      setSuccessMsg('Se este e-mail estiver cadastrado, você receberá um link de recuperação em instantes. Verifique também sua caixa de spam.');
       
       setTimeout(() => {
-        router.push('/');
-      }, 2000);
-    } catch (error) {
-      setErrorMsg('Erro ao atualizar a senha.');
+        router.back();
+      }, 6000);
+
+    } catch (error: any) {
+      console.error("Erro ao recuperar senha:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-email') {
+        setErrorMsg('Este e-mail não foi encontrado no nosso sistema. Verifique se digitou corretamente.');
+      } else {
+        setErrorMsg('Ocorreu um erro ao tentar enviar o e-mail. Tente novamente mais tarde.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <LinearGradient
-      colors={['#c2f0f7', '#f7c2e0']}
-      style={{ flex: 1 }}
-    >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <LinearGradient colors={['#e6f5f9', '#e0eaf5', '#dce0f2']} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-             <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
+          <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={24} color="#1a3b5c" />
+            </TouchableOpacity>
 
-          <Text style={styles.title}>Recuperar Senha</Text>
+            <View style={styles.header}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="key-outline" size={40} color="#6a7fdb" />
+              </View>
+              <Text style={styles.title}>Recuperar Senha</Text>
+              <Text style={styles.subtitle}>
+                Digite seu e-mail cadastrado para receber as instruções de recuperação.
+              </Text>
+            </View>
 
-          <View style={styles.card}>
-            {step === 1 ? (
-              <>
-                <Text style={styles.cardTitle}>Qual é o seu e-mail?</Text>
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <Ionicons name="mail-outline" size={20} color="#6a7fdb" style={styles.inputIcon} />
                 <TextInput
-                  placeholder="Seu e-mail cadastrado"
                   style={styles.input}
+                  placeholder="Seu e-mail"
                   value={email}
                   onChangeText={setEmail}
-                  keyboardType="email-address"
                   autoCapitalize="none"
+                  keyboardType="email-address"
                 />
-                
-                {errorMsg !== '' && <Text style={styles.errorText}>{errorMsg}</Text>}
+              </View>
 
-                <TouchableOpacity style={styles.primaryBtn} onPress={handleVerifyEmail}>
-                  <Text style={styles.btnText}>Verificar</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.cardTitle}>Digite a nova senha</Text>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    placeholder="Nova Senha"
-                    secureTextEntry={!showPassword}
-                    style={styles.passwordInput}
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                  />
-                  <TouchableOpacity 
-                    style={styles.eyeIcon} 
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={24} color="#666" />
-                  </TouchableOpacity>
-                </View>
+              {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+              {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
 
-                {errorMsg !== '' && <Text style={styles.errorText}>{errorMsg}</Text>}
-                {successMsg !== '' && <Text style={styles.successText}>{successMsg}</Text>}
+              <TouchableOpacity 
+                style={[styles.button, loading && { opacity: 0.7 }]} 
+                onPress={handleSendResetEmail}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Enviando...' : 'Enviar E-mail'}
+                </Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity style={styles.primaryBtn} onPress={handleResetPassword}>
-                  <Text style={styles.btnText}>Atualizar Senha</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
+                <Text style={styles.backLinkText}>Voltar para o Login</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
-

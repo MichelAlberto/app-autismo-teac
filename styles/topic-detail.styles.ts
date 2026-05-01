@@ -1,7 +1,6 @@
 import { Dimensions, StyleSheet } from "react-native";
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-
+// Dimensões removidas para uso de useWindowDimensions no componente
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -61,17 +60,14 @@ export const styles = StyleSheet.create({
     marginTop: 20,
   },
   slideWrapper: {
-    width: screenWidth,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
   },
   card: {
-    width: screenWidth * 0.88,
-    height: screenHeight * 0.52,
     backgroundColor: "transparent",
     zIndex: 1,
-    perspective: 1000, // Adicionado para efeito 3D na Web
+    transform: [{ perspective: 1000 }], // Adicionado para efeito 3D na Web
   },
   cardFace: {
     width: '100%',

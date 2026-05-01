@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Share, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Share, Image, ScrollView } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -268,7 +268,10 @@ export default function CertificateScreen() {
           <Text style={styles.headerTitle}>Seu Certificado</Text>
         </View>
 
-        <View style={styles.content}>
+        <ScrollView 
+          contentContainerStyle={styles.contentScroll}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.certificateCard}>
             {/* Borda Dourada Interna */}
             <View style={styles.certificateInnerBorder}>
@@ -319,17 +322,12 @@ export default function CertificateScreen() {
           </Text>
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.downloadBtn} onPress={handleShare}>
-              <Ionicons name="share-social-outline" size={24} color="#ffffff" style={{ marginRight: 10 }} />
-              <Text style={styles.buttonText}>Compartilhar Conquista</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.printBtn} onPress={generatePdf}>
               <Ionicons name="download-outline" size={24} color="#3949AB" style={{ marginRight: 10 }} />
-              <Text style={[styles.buttonText, { color: "#3949AB" }]}>Salvar em PDF</Text>
+              <Text style={[styles.buttonText, { color: "#3949AB" }]}>Baixar Certificado (PDF)</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
 
       </SafeAreaView>
     </View>
@@ -366,15 +364,15 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     marginRight: 40,
   },
-  content: {
-    flex: 1,
+  contentScroll: {
+    flexGrow: 1,
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
+    paddingBottom: 40,
   },
   certificateCard: {
     width: "100%",
-    aspectRatio: 0.85,
     backgroundColor: "#ffffff",
     borderRadius: 40,
     padding: 15,
@@ -385,13 +383,11 @@ const styles = StyleSheet.create({
     elevation: 15,
   },
   certificateInnerBorder: {
-    flex: 1,
     borderWidth: 2,
     borderColor: "#D4AF37",
     borderRadius: 30,
     padding: 20,
     alignItems: "center",
-    justifyContent: "space-between",
   },
   illustrationPlaceholder: {
     marginTop: 10,
@@ -444,8 +440,8 @@ const styles = StyleSheet.create({
   },
   signatureContainer: {
     alignItems: "center",
-    marginTop: 10,
-    marginBottom: -10,
+    marginTop: 30,
+    marginBottom: 20,
   },
   signatureName: {
     fontSize: 22,
@@ -473,7 +469,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     paddingHorizontal: 10,
-    marginBottom: 10,
+    marginTop: 10,
+    marginBottom: 5,
   },
   sealContainer: {
     alignItems: "center",

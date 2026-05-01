@@ -1,80 +1,129 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TextInput, 
+  TouchableOpacity, 
+  ScrollView, 
+  Alert, 
+  ActivityIndicator,
+  RefreshControl 
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+// IMPORTES FIREBASE
+import { db } from './firebaseConfig';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc 
+} from 'firebase/firestore';
+
+import MenuLateral from '../components/MenuLateral';
+
 export default function Forum() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [novaPergunta, setNovaPergunta] = useState('');
-  const [respostas, setRespostas] = useState<{ [key: number]: string }>({});
+  const [respostas, setRespostas] = useState<{ [key: string]: string }>({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Assim que a tela carrega, nós tentamos identificar se o usuário é administrador ou normal
-  // E também puxamos todos os dados do banco de dados local "teac_forum_messages"
   useEffect(() => {
+    getUser();
     loadData();
   }, []);
 
-  const loadData = async () => {
+  const getUser = async () => {
     const userJson = await AsyncStorage.getItem('teac_current_user');
     if (userJson) setCurrentUser(JSON.parse(userJson));
+  };
 
-    const forumJson = await AsyncStorage.getItem('teac_forum_messages');
-    if (forumJson) {
-      setMessages(JSON.parse(forumJson));
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Busca perguntas ordenadas pela data (mais recentes primeiro)
+      const q = query(collection(db, "forum_topics"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const docs: any[] = [];
+      querySnapshot.forEach((doc) => {
+        docs.push({ id: doc.id, ...doc.data() });
+      });
+      setMessages(docs);
+    } catch (e) {
+      console.error("Erro ao carregar fórum:", e);
+      Alert.alert("Erro", "Não foi possível carregar as mensagens.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
   const handleAsk = async () => {
-    if (!novaPergunta) return;
-    const isMock = !currentUser; // Caso a pessoa tenha pulado o login de alguma forma
-    const author = isMock ? 'Visitante' : currentUser.nome;
-    const newMsg = {
-      id: Date.now(),
-      author,
-      pergunta: novaPergunta,
-      resposta: ''
-    };
+    if (!novaPergunta.trim()) return;
     
-    // Injetamos a nova pergunta no topo da lista
-    const updated = [newMsg, ...messages];
-    setMessages(updated);
-    setNovaPergunta('');
-    
-    // Salvamos a matriz inteira atualizada no dispositivo do usuário
-    await AsyncStorage.setItem('teac_forum_messages', JSON.stringify(updated));
-    Alert.alert('Sucesso', 'Sua pergunta foi enviada aos especialistas!');
+    setLoading(true);
+    try {
+      const author = currentUser ? currentUser.nome : 'Visitante';
+      
+      const newTopic = {
+        author,
+        authorId: currentUser?.uid || 'anonimo',
+        pergunta: novaPergunta,
+        resposta: '',
+        responsavel: '',
+        createdAt: new Date().toISOString()
+      };
+      
+      await addDoc(collection(db, "forum_topics"), newTopic);
+      
+      setNovaPergunta('');
+      Alert.alert('Sucesso', 'Sua pergunta foi enviada aos especialistas!');
+      loadData(); // Recarrega a lista
+    } catch (e) {
+      console.error("Erro ao postar pergunta:", e);
+      Alert.alert("Erro", "Falha ao enviar pergunta.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReply = async (id: number) => {
-    const text = respostas[id];
-    if (!text) return;
+  const handleReply = async (docId: string) => {
+    const text = respostas[docId];
+    if (!text || !text.trim()) return;
     
-    const updated = messages.map(m => {
-      // Quando achamos o id da pergunta original, injetamos a resposta
-      if (m.id === id) {
-        return { ...m, resposta: text, responsavel: currentUser?.nome || 'Admin' };
-      }
-      return m;
-    });
+    setLoading(true);
+    try {
+      const topicRef = doc(db, "forum_topics", docId);
+      
+      await updateDoc(topicRef, {
+        resposta: text,
+        responsavel: currentUser?.nome || 'Admin',
+        repliedAt: new Date().toISOString()
+      });
 
-    setMessages(updated);
-    await AsyncStorage.setItem('teac_forum_messages', JSON.stringify(updated));
-    Alert.alert('Sucesso', 'Sua resposta profissional foi publicada!');
-  };
-
-  const handleLogout = () => {
-    Alert.alert('Sair', 'Tem certeza que deseja deslogar e voltar ao início?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: async () => {
-          await AsyncStorage.removeItem('teac_current_user');
-          router.replace('/');
-        }
-      }
-    ]);
+      Alert.alert('Sucesso', 'Sua resposta foi publicada!');
+      loadData(); // Recarrega a lista
+    } catch (e) {
+      console.error("Erro ao responder:", e);
+      Alert.alert("Erro", "Falha ao enviar resposta.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -86,35 +135,45 @@ export default function Forum() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Fórum de Dúvidas</Text>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={28} color="#e53935" />
-          </TouchableOpacity>
+          <MenuLateral />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* SE NÃO FOR ADMIN, MOSTRA CAIXA VERDE DE PERGUNTAR */}
+        <ScrollView 
+          contentContainerStyle={styles.scroll} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {(!currentUser || !currentUser.isAdmin) && (
             <View style={styles.askContainer}>
               <Text style={styles.askTitle}>Faça uma pergunta aos especialistas:</Text>
               <TextInput
                 style={styles.askInput}
-                placeholder="Ex: Como lidar com a seletividade alimentar nestes casos?"
+                placeholder="Ex: Como lidar com a seletividade alimentar?"
                 value={novaPergunta}
                 onChangeText={setNovaPergunta}
                 multiline
+                editable={!loading}
               />
-              <TouchableOpacity style={styles.askBtn} onPress={handleAsk}>
-                <Text style={styles.askBtnText}>Enviar Pergunta</Text>
+              <TouchableOpacity 
+                style={[styles.askBtn, loading && { opacity: 0.7 }]} 
+                onPress={handleAsk}
+                disabled={loading}
+              >
+                {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.askBtnText}>Enviar Pergunta</Text>}
               </TouchableOpacity>
             </View>
           )}
 
-          <Text style={styles.sectionTitle}>Tópicos Recentes da Comunidade</Text>
+          <Text style={styles.sectionTitle}>Tópicos Recentes</Text>
 
-          {messages.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhuma pergunta foi feita ainda. Seja o primeiro da nossa comunidade!</Text>
+          {loading && !refreshing && <ActivityIndicator size="large" color="#1a3b5c" style={{ marginTop: 20 }} />}
+
+          {!loading && messages.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhuma pergunta feita ainda. Puxe para baixo para atualizar.</Text>
           ) : (
-            messages.map((msg) => (
+            messages.map((msg: any) => (
               <View key={msg.id} style={styles.messageCard}>
                 <View style={styles.authorRow}>
                   <Ionicons name="person-circle" size={20} color="#666" />
@@ -122,29 +181,32 @@ export default function Forum() {
                 </View>
                 <Text style={styles.questionText}>{msg.pergunta}</Text>
 
-                {/* SE TIVER SIDO RESPONDIDA, MOSTRA CAIXA DE SUCESSO VERDE */}
                 {msg.resposta ? (
                   <View style={styles.answerBox}>
                     <Text style={styles.adminName}>@{msg.responsavel || 'Especialista'} respondeu:</Text>
                     <Text style={styles.answerText}>{msg.resposta}</Text>
                   </View>
                 ) : (
-                  /* SE NÃO TIVER RESPOSTA AINDA, E QUEM ESTIVER VENDO A TELA FOR ADMIN, MOSTRA CAIXA AZUL PARA RESPONDER */
                   currentUser && currentUser.isAdmin ? (
                     <View style={styles.replyContainer}>
                       <TextInput
                         style={styles.replyInput}
-                        placeholder="Escreva sua resposta profissional aqui..."
+                        placeholder="Escreva sua resposta aqui..."
                         value={respostas[msg.id] || ''}
                         onChangeText={(t) => setRespostas({ ...respostas, [msg.id]: t })}
                         multiline
+                        editable={!loading}
                       />
-                      <TouchableOpacity style={styles.replyBtn} onPress={() => handleReply(msg.id)}>
-                        <Text style={styles.replyBtnText}>Responder a Dúvida</Text>
+                      <TouchableOpacity 
+                        style={[styles.replyBtn, loading && { opacity: 0.7 }]} 
+                        onPress={() => handleReply(msg.id)}
+                        disabled={loading}
+                      >
+                         {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.replyBtnText}>Responder</Text>}
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <Text style={styles.waitingText}>[Aguardando resposta de um especialista na plataforma...]</Text>
+                    <Text style={styles.waitingText}>[Aguardando resposta de um especialista...]</Text>
                   )
                 )}
               </View>
@@ -205,6 +267,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
+    minHeight: 45,
+    justifyContent: 'center',
   },
   askBtnText: {
     color: '#fff',
@@ -287,6 +351,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     alignItems: 'center',
+    minHeight: 40,
+    justifyContent: 'center',
   },
   replyBtnText: {
     color: '#fff',

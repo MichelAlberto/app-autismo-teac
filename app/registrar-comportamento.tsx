@@ -36,6 +36,12 @@ const TRIGGERS = ['Mudança de rotina', 'Barulho', 'Interação social', 'Frustr
 const DURATIONS = ['< 5 min', '5 - 15 min', '15 - 30 min', '+ 30 min'];
 const INTERVENTIONS = ['Conversa', 'Retirada do ambiente', 'Ignorar comportamento', 'Técnica de respiração'];
 
+// IMPORT FIREBASE
+import { db } from "./firebaseConfig";
+import { collection, addDoc } from "firebase/firestore";
+
+import Toast from "../components/Toast";
+
 export default function RegistrarComportamento() {
   const [selectedType, setSelectedType] = useState('');
   const [customTypeDescription, setCustomTypeDescription] = useState('');
@@ -46,7 +52,19 @@ export default function RegistrarComportamento() {
   const [selectedInterventions, setSelectedInterventions] = useState<string[]>([]);
   const [interventionText, setInterventionText] = useState('');
   const [observations, setObservations] = useState('');
+  const [loading, setLoading] = useState(false);
   
+  // Estados do Toast
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error" | "info">("info");
+
+  const showToast = (msg: string, type: "success" | "error" | "info") => {
+    setToastMessage(msg);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   // Estados para Data e Hora
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -92,44 +110,66 @@ export default function RegistrarComportamento() {
 
   const handleSave = async () => {
     if (!selectedType) {
-      Alert.alert("Erro", "Por favor, selecione o tipo de comportamento.");
+      showToast("Selecione o tipo de comportamento.", "error");
       return;
     }
 
-    const newReport = {
-      id: Date.now().toString(),
-      type: selectedType,
-      typeLabel: BEHAVIOR_TYPES.find(t => t.id === selectedType)?.label,
-      customTypeDescription,
-      intensity,
-      triggers: selectedTriggers,
-      triggerText,
-      duration,
-      interventions: selectedInterventions,
-      interventionText,
-      observations,
-      date: dateStr,
-      time: timeStr,
-      timestamp: date.getTime(),
-    };
-
+    setLoading(true);
     try {
+      // 1. Pegar usuário logado
+      const userJson = await AsyncStorage.getItem("teac_current_user");
+      if (!userJson) {
+        showToast("Usuário não identificado.", "error");
+        return;
+      }
+      const user = JSON.parse(userJson);
+
+      const newReport = {
+        type: selectedType,
+        typeLabel: BEHAVIOR_TYPES.find(t => t.id === selectedType)?.label,
+        customTypeDescription,
+        intensity,
+        triggers: selectedTriggers,
+        triggerText,
+        duration,
+        interventions: selectedInterventions,
+        interventionText,
+        observations,
+        date: dateStr,
+        time: timeStr,
+        timestamp: date.getTime(),
+        createdAt: new Date().toISOString()
+      };
+
+      // 2. Salvar na nuvem (Firestore)
+      await addDoc(collection(db, "users", user.uid, "comportamentos"), newReport);
+
+      // 3. Cache local opcional
       const existing = await AsyncStorage.getItem('teac_behavior_reports');
       const reports = existing ? JSON.parse(existing) : [];
-      const updated = [newReport, ...reports];
-      await AsyncStorage.setItem('teac_behavior_reports', JSON.stringify(updated));
+      await AsyncStorage.setItem('teac_behavior_reports', JSON.stringify([newReport, ...reports]));
       
-      Alert.alert("Sucesso", "Registro de comportamento salvo com sucesso!", [
-        { text: "OK", onPress: () => router.back() }
-      ]);
-    } catch (e) {
-      console.error(e);
-      Alert.alert("Erro", "Não foi possível salvar o registro.");
+      showToast("Registro salvo com sucesso!", "success");
+      
+      setTimeout(() => {
+        router.back();
+      }, 2000);
+    } catch (e: any) {
+      console.error("ERRO AO SALVAR COMPORTAMENTO:", e);
+      showToast("Erro ao salvar: " + e.message, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <LinearGradient colors={["#e6f5f9", "#e0eaf5", "#dce0f2"]} style={{ flex: 1 }}>
+      <Toast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           
