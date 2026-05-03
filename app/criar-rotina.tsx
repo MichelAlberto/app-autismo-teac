@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/rotina.styles";
+import { useTheme } from "../context/ThemeContext";
 
 interface Task {
   id: string;
@@ -102,12 +103,12 @@ export default function CriarRotina() {
 
       setTasks(docs);
 
-      // 3. Cache local opcional
-      await AsyncStorage.setItem("teac_rotinas_lista", JSON.stringify(docs));
+      // 3. Cache local opcional (VINCULADO AO UID)
+      await AsyncStorage.setItem(`teac_rotinas_lista_${user.uid}`, JSON.stringify(docs));
     } catch (e) {
       console.error("Erro ao carregar rotinas:", e);
-      // Fallback para local se offline
-      const existing = await AsyncStorage.getItem("teac_rotinas_lista");
+      // Fallback para local se offline (VINCULADO AO UID)
+      const existing = await AsyncStorage.getItem(`teac_rotinas_lista_${user.uid}`);
       if (existing) setTasks(JSON.parse(existing));
     } finally {
       setLoading(false);
@@ -179,8 +180,13 @@ export default function CriarRotina() {
     }
   };
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <LinearGradient colors={["#e6f5f9", "#e0eaf5", "#dce0f2"]} style={{ flex: 1 }}>
+    <LinearGradient 
+      colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ["#e6f5f9", "#e0eaf5", "#dce0f2"]} 
+      style={{ flex: 1 }}
+    >
       <Toast 
         visible={toastVisible} 
         message={toastMessage} 
@@ -192,17 +198,17 @@ export default function CriarRotina() {
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             
             <View style={styles.header}>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={24} color="#1a3b5c" />
+              <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, isDark && { backgroundColor: colors.card }]}>
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Minhas Rotinas</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Minhas Rotinas</Text>
               <View style={{ width: 40 }} />
             </View>
             
             <View style={styles.timelineContainer}>
-              <Text style={styles.label}>ATIVIDADES SALVAS</Text>
+              <Text style={[styles.label, { color: colors.subtext }]}>ATIVIDADES SALVAS</Text>
               {tasks.map((item) => (
-                <TouchableOpacity key={item.id} onPress={() => openDetailModal(item)} style={styles.taskCard}>
+                <TouchableOpacity key={item.id} onPress={() => openDetailModal(item)} style={[styles.taskCard, { backgroundColor: colors.card }]}>
                   <View style={[styles.iconBox, { backgroundColor: item.color + "20" }]}>
                     {item.iconType === "Ionicons" ? (
                       <Ionicons name={item.icon as any} size={28} color={item.color} />
@@ -211,24 +217,24 @@ export default function CriarRotina() {
                     )}
                   </View>
                   <View style={styles.taskInfo}>
-                    <Text style={styles.taskTitle}>{item.title}</Text>
-                    <Text style={styles.taskTime}>{item.time} • <Text style={styles.taskDate}>{item.date}</Text></Text>
+                    <Text style={[styles.taskTitle, { color: colors.text }]}>{item.title}</Text>
+                    <Text style={[styles.taskTime, { color: colors.subtext }]}>{item.time} • <Text style={[styles.taskDate, { color: colors.subtext }]}>{item.date}</Text></Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#cbd5e0" />
+                  <Ionicons name="chevron-forward" size={20} color={isDark ? colors.border : "#cbd5e0"} />
                 </TouchableOpacity>
               ))}
 
               {tasks.length === 0 && (
                 <View style={{ alignItems: 'center', marginTop: 50, opacity: 0.5 }}>
-                  <Ionicons name="calendar-outline" size={60} color="#ccc" />
-                  <Text style={{ color: '#999', marginTop: 10 }}>Nenhuma rotina criada ainda.</Text>
+                  <Ionicons name="calendar-outline" size={60} color={isDark ? colors.subtext : "#ccc"} />
+                  <Text style={{ color: colors.subtext, marginTop: 10 }}>Nenhuma rotina criada ainda.</Text>
                 </View>
               )}
             </View>
           </ScrollView>
 
           <TouchableOpacity 
-            style={styles.addTaskBtn} 
+            style={[styles.addTaskBtn, { backgroundColor: colors.accent }]} 
             onPress={openAddModal}
           >
             <Ionicons name="add-circle" size={28} color="#ffffff" />
@@ -246,11 +252,11 @@ export default function CriarRotina() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{viewMode ? "Detalhes da Rotina" : "Nova Rotina"}</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{viewMode ? "Detalhes da Rotina" : "Nova Rotina"}</Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={28} color="#1a3b5c" />
+                  <Ionicons name="close" size={28} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -261,19 +267,19 @@ export default function CriarRotina() {
                       <View style={[styles.iconBox, { backgroundColor: selectedTask?.color + "20", width: 80, height: 80, borderRadius: 25 }]}>
                         <Ionicons name={selectedTask?.icon as any} size={40} color={selectedTask?.color} />
                       </View>
-                      <Text style={[styles.taskTitle, { fontSize: 24, marginTop: 10 }]}>{selectedTask?.title}</Text>
-                      <Text style={styles.taskTime}>{selectedTask?.time} • {selectedTask?.date}</Text>
+                      <Text style={[styles.taskTitle, { fontSize: 24, marginTop: 10, color: colors.text }]}>{selectedTask?.title}</Text>
+                      <Text style={[styles.taskTime, { color: colors.subtext }]}>{selectedTask?.time} • {selectedTask?.date}</Text>
                     </View>
 
-                    <Text style={styles.label}>O QUE ESCREVI:</Text>
-                    <View style={[styles.textArea, { backgroundColor: '#f0f4f8', minHeight: 120 }]}>
-                      <Text style={{ fontSize: 16, color: '#3b4352', lineHeight: 22 }}>
+                    <Text style={[styles.label, { color: colors.subtext }]}>O QUE ESCREVI:</Text>
+                    <View style={[styles.textArea, { backgroundColor: isDark ? colors.background : '#f0f4f8', minHeight: 120, borderColor: colors.border }]}>
+                      <Text style={{ fontSize: 16, color: colors.text, lineHeight: 22 }}>
                         {selectedTask?.description || "Nenhuma descrição adicionada."}
                       </Text>
                     </View>
 
                     <TouchableOpacity 
-                      style={[styles.saveBtn, { backgroundColor: '#ff5252', marginTop: 30 }]} 
+                      style={[styles.saveBtn, { backgroundColor: '#ef4444', marginTop: 30 }]} 
                       onPress={removeTaskFromDetail}
                     >
                       <Text style={styles.saveBtnText}>Excluir Rotina</Text>
@@ -281,18 +287,20 @@ export default function CriarRotina() {
                   </View>
                 ) : (
                   <View>
-                    <Text style={styles.label}>Título da Atividade</Text>
+                    <Text style={[styles.label, { color: colors.subtext }]}>Título da Atividade</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { backgroundColor: isDark ? colors.background : '#f8fafc', color: colors.text, borderColor: colors.border }]}
                       placeholder="Ex: Escovar os dentes"
+                      placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
                       value={newTaskTitle}
                       onChangeText={setNewTaskTitle}
                     />
 
-                    <Text style={[styles.label, { marginTop: 20 }]}>Descrição / Observações</Text>
+                    <Text style={[styles.label, { marginTop: 20, color: colors.subtext }]}>Descrição / Observações</Text>
                     <TextInput
-                      style={styles.textArea}
+                      style={[styles.textArea, { backgroundColor: isDark ? colors.background : '#f8fafc', color: colors.text, borderColor: colors.border }]}
                       placeholder="Escreva detalhes aqui..."
+                      placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
                       multiline
                       numberOfLines={4}
                       value={newTaskDesc}
@@ -301,18 +309,18 @@ export default function CriarRotina() {
 
                     <View style={styles.dateTimeRow}>
                       <View style={styles.dateTimeField}>
-                        <Text style={styles.label}>Data</Text>
-                        <TouchableOpacity style={styles.pickerBtn} onPress={() => setShowDatePicker(true)}>
-                          <Text style={styles.pickerBtnText}>{taskDate.toLocaleDateString('pt-BR')}</Text>
-                          <Ionicons name="calendar-outline" size={20} color="#6a7fdb" />
+                        <Text style={[styles.label, { color: colors.subtext }]}>Data</Text>
+                        <TouchableOpacity style={[styles.pickerBtn, { backgroundColor: isDark ? colors.background : '#f8fafc', borderColor: colors.border }]} onPress={() => setShowDatePicker(true)}>
+                          <Text style={[styles.pickerBtnText, { color: colors.text }]}>{taskDate.toLocaleDateString('pt-BR')}</Text>
+                          <Ionicons name="calendar-outline" size={20} color={colors.accent} />
                         </TouchableOpacity>
                       </View>
 
                       <View style={styles.dateTimeField}>
-                        <Text style={styles.label}>Horário</Text>
-                        <TouchableOpacity style={styles.pickerBtn} onPress={() => setShowTimePicker(true)}>
-                          <Text style={styles.pickerBtnText}>{taskTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
-                          <Ionicons name="time-outline" size={20} color="#6a7fdb" />
+                        <Text style={[styles.label, { color: colors.subtext }]}>Horário</Text>
+                        <TouchableOpacity style={[styles.pickerBtn, { backgroundColor: isDark ? colors.background : '#f8fafc', borderColor: colors.border }]} onPress={() => setShowTimePicker(true)}>
+                          <Text style={[styles.pickerBtnText, { color: colors.text }]}>{taskTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                          <Ionicons name="time-outline" size={20} color={colors.accent} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -342,12 +350,16 @@ export default function CriarRotina() {
                       />
                     )}
 
-                    <Text style={[styles.label, { marginTop: 20 }]}>Ícone</Text>
+                    <Text style={[styles.label, { marginTop: 20, color: colors.subtext }]}>Ícone</Text>
                     <View style={styles.iconGrid}>
                       {ICON_OPTIONS.map((opt) => (
                         <TouchableOpacity
                           key={opt.name}
-                          style={[styles.iconOption, selectedIcon.name === opt.name && styles.iconOptionSelected]}
+                          style={[
+                            styles.iconOption, 
+                            { backgroundColor: isDark ? colors.background : '#f8fafc', borderColor: colors.border },
+                            selectedIcon.name === opt.name && [styles.iconOptionSelected, { borderColor: colors.accent, backgroundColor: colors.accent + '10' }]
+                          ]}
                           onPress={() => setSelectedIcon(opt)}
                         >
                           <Ionicons name={opt.name as any} size={28} color={opt.color} />
@@ -355,7 +367,7 @@ export default function CriarRotina() {
                       ))}
                     </View>
 
-                    <TouchableOpacity style={styles.saveBtn} onPress={handleAddTask}>
+                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={handleAddTask}>
                       <Text style={styles.saveBtnText}>Salvar na Lista</Text>
                     </TouchableOpacity>
                   </View>

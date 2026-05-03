@@ -6,7 +6,6 @@ import {
   TextInput, 
   TouchableOpacity, 
   ScrollView, 
-  Alert, 
   ActivityIndicator,
   RefreshControl 
 } from 'react-native';
@@ -29,14 +28,45 @@ import {
 } from 'firebase/firestore';
 
 import MenuLateral from '../components/MenuLateral';
+import { useTheme } from '../context/ThemeContext';
+import CustomAlert from '../components/CustomAlert';
+import { Image } from 'react-native';
 
 export default function Forum() {
+  const { colors, isDark } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [novaPergunta, setNovaPergunta] = useState('');
   const [respostas, setRespostas] = useState<{ [key: string]: string }>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Custom Alert states
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    type: 'warning' | 'danger' | 'success' | 'info';
+    onConfirm: () => void;
+  }>({
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string, type: any = 'info', onConfirm: any = null) => {
+    setAlertConfig({
+      title,
+      message,
+      type,
+      onConfirm: () => {
+        setAlertVisible(false);
+        if (onConfirm) onConfirm();
+      }
+    });
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     getUser();
@@ -61,7 +91,7 @@ export default function Forum() {
       setMessages(docs);
     } catch (e) {
       console.error("Erro ao carregar fórum:", e);
-      Alert.alert("Erro", "Não foi possível carregar as mensagens.");
+      showAlert("Erro", "Não foi possível carregar as mensagens.", "danger");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -79,10 +109,12 @@ export default function Forum() {
     setLoading(true);
     try {
       const author = currentUser ? currentUser.nome : 'Visitante';
+      const authorPhoto = currentUser?.profilePhoto || null;
       
       const newTopic = {
         author,
         authorId: currentUser?.uid || 'anonimo',
+        authorPhoto,
         pergunta: novaPergunta,
         resposta: '',
         responsavel: '',
@@ -92,11 +124,11 @@ export default function Forum() {
       await addDoc(collection(db, "forum_topics"), newTopic);
       
       setNovaPergunta('');
-      Alert.alert('Sucesso', 'Sua pergunta foi enviada aos especialistas!');
+      showAlert('Sucesso', 'Sua pergunta foi enviada aos especialistas!', 'success');
       loadData(); // Recarrega a lista
     } catch (e) {
       console.error("Erro ao postar pergunta:", e);
-      Alert.alert("Erro", "Falha ao enviar pergunta.");
+      showAlert("Erro", "Falha ao enviar pergunta.", "danger");
     } finally {
       setLoading(false);
     }
@@ -116,24 +148,35 @@ export default function Forum() {
         repliedAt: new Date().toISOString()
       });
 
-      Alert.alert('Sucesso', 'Sua resposta foi publicada!');
+      showAlert('Sucesso', 'Sua resposta foi publicada!', 'success');
       loadData(); // Recarrega a lista
     } catch (e) {
       console.error("Erro ao responder:", e);
-      Alert.alert("Erro", "Falha ao enviar resposta.");
+      showAlert("Erro", "Falha ao enviar resposta.", "danger");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <LinearGradient colors={['#e6f5f9', '#e0eaf5', '#dce0f2']} style={{ flex: 1 }}>
+    <LinearGradient 
+      colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ['#e6f5f9', '#e0eaf5', '#dce0f2']} 
+      style={{ flex: 1 }}
+    >
       <SafeAreaView style={{ flex: 1 }}>
+        <CustomAlert 
+          visible={alertVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          type={alertConfig.type}
+          onConfirm={alertConfig.onConfirm}
+          onCancel={() => setAlertVisible(false)}
+        />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#1a3b5c" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Fórum de Dúvidas</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Fórum de Dúvidas</Text>
           <View style={{ flex: 1 }} />
           <MenuLateral />
         </View>
@@ -142,22 +185,23 @@ export default function Forum() {
           contentContainerStyle={styles.scroll} 
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }
         >
           {(!currentUser || !currentUser.isAdmin) && (
-            <View style={styles.askContainer}>
-              <Text style={styles.askTitle}>Faça uma pergunta aos especialistas:</Text>
+            <View style={[styles.askContainer, { backgroundColor: colors.card }]}>
+              <Text style={[styles.askTitle, { color: colors.text }]}>Faça uma pergunta aos especialistas:</Text>
               <TextInput
-                style={styles.askInput}
+                style={[styles.askInput, { backgroundColor: isDark ? colors.background : '#f5f5f5', color: colors.text }]}
                 placeholder="Ex: Como lidar com a seletividade alimentar?"
+                placeholderTextColor={colors.subtext}
                 value={novaPergunta}
                 onChangeText={setNovaPergunta}
                 multiline
                 editable={!loading}
               />
               <TouchableOpacity 
-                style={[styles.askBtn, loading && { opacity: 0.7 }]} 
+                style={[styles.askBtn, { backgroundColor: colors.accent }, loading && { opacity: 0.7 }]} 
                 onPress={handleAsk}
                 disabled={loading}
               >
@@ -166,39 +210,46 @@ export default function Forum() {
             </View>
           )}
 
-          <Text style={styles.sectionTitle}>Tópicos Recentes</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Tópicos Recentes</Text>
 
-          {loading && !refreshing && <ActivityIndicator size="large" color="#1a3b5c" style={{ marginTop: 20 }} />}
+          {loading && !refreshing && <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 20 }} />}
 
           {!loading && messages.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhuma pergunta feita ainda. Puxe para baixo para atualizar.</Text>
+            <Text style={[styles.emptyText, { color: colors.subtext }]}>Nenhuma pergunta feita ainda. Puxe para baixo para atualizar.</Text>
           ) : (
             messages.map((msg: any) => (
-              <View key={msg.id} style={styles.messageCard}>
+              <View key={msg.id} style={[styles.messageCard, { backgroundColor: colors.card }]}>
                 <View style={styles.authorRow}>
-                  <Ionicons name="person-circle" size={20} color="#666" />
-                  <Text style={styles.authorText}>{msg.author} perguntou:</Text>
+                  <View style={styles.avatarMiniContainer}>
+                    {msg.authorPhoto ? (
+                      <Image source={{ uri: msg.authorPhoto }} style={styles.avatarMini} />
+                    ) : (
+                      <Ionicons name="person-circle" size={24} color={colors.subtext} />
+                    )}
+                  </View>
+                  <Text style={[styles.authorText, { color: colors.text }]}>{msg.author} perguntou:</Text>
                 </View>
-                <Text style={styles.questionText}>{msg.pergunta}</Text>
+                <Text style={[styles.questionText, { color: colors.text }]}>{msg.pergunta}</Text>
 
                 {msg.resposta ? (
-                  <View style={styles.answerBox}>
-                    <Text style={styles.adminName}>@{msg.responsavel || 'Especialista'} respondeu:</Text>
-                    <Text style={styles.answerText}>{msg.resposta}</Text>
+                  <View style={[styles.answerBox, { backgroundColor: isDark ? '#1e3a8a' : '#e8f5e9', borderLeftColor: isDark ? '#3b82f6' : '#4caf50' }]}>
+                    <Text style={[styles.adminName, { color: isDark ? '#93c5fd' : '#2e7d32' }]}>@{msg.responsavel || 'Especialista'} respondeu:</Text>
+                    <Text style={[styles.answerText, { color: isDark ? '#dbeafe' : '#1b5e20' }]}>{msg.resposta}</Text>
                   </View>
                 ) : (
                   currentUser && currentUser.isAdmin ? (
-                    <View style={styles.replyContainer}>
+                    <View style={[styles.replyContainer, { borderTopColor: colors.border }]}>
                       <TextInput
-                        style={styles.replyInput}
+                        style={[styles.replyInput, { backgroundColor: colors.background, color: colors.text }]}
                         placeholder="Escreva sua resposta aqui..."
+                        placeholderTextColor={colors.subtext}
                         value={respostas[msg.id] || ''}
                         onChangeText={(t) => setRespostas({ ...respostas, [msg.id]: t })}
                         multiline
                         editable={!loading}
                       />
                       <TouchableOpacity 
-                        style={[styles.replyBtn, loading && { opacity: 0.7 }]} 
+                        style={[styles.replyBtn, { backgroundColor: colors.accent }, loading && { opacity: 0.7 }]} 
                         onPress={() => handleReply(msg.id)}
                         disabled={loading}
                       >
@@ -206,7 +257,7 @@ export default function Forum() {
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <Text style={styles.waitingText}>[Aguardando resposta de um especialista...]</Text>
+                    <Text style={[styles.waitingText, { color: colors.subtext }]}>[Aguardando resposta de um especialista...]</Text>
                   )
                 )}
               </View>
@@ -299,10 +350,23 @@ const styles = StyleSheet.create({
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: 8,
+  },
+  avatarMiniContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginRight: 8,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarMini: {
+    width: '100%',
+    height: '100%',
   },
   authorText: {
-    marginLeft: 5,
     fontWeight: '600',
     color: '#555',
   },

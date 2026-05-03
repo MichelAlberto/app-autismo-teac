@@ -111,6 +111,7 @@ export const styles = StyleSheet.create({
     color: "#5b6574",
     fontWeight: "600",
     marginBottom: 15,
+    textAlign: "center",
   },
   certificateBtn: {
     backgroundColor: "#3B82F6",
@@ -145,7 +146,7 @@ export const styles = StyleSheet.create({
   moduleTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#3b4352",
+    color: "#f2f5faff",
     marginBottom: 12,
     paddingHorizontal: 5,
   },

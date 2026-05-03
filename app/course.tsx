@@ -8,8 +8,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/course.styles";
 import { COURSE_DATA } from "../constants/courseData";
 import { TOPIC_CONTENT } from "../constants/topicContent";
-import { auth, db } from "./firebaseConfig";
+import { db } from "./firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
+import { useTheme } from "../context/ThemeContext";
 
 import MenuLateral from "../components/MenuLateral";
 
@@ -100,9 +101,11 @@ export default function Course() {
     return totalCount > 0 && revealedCount >= totalCount;
   };
 
+  const { colors, isDark } = useTheme();
+
   return (
     <LinearGradient
-      colors={["#e6f5f9", "#e0eaf5", "#dce0f2"]}
+      colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ["#e6f5f9", "#e0eaf5", "#dce0f2"]}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={{ flex: 1 }}>
@@ -124,16 +127,16 @@ export default function Course() {
             paddingBottom: 5
           }}>
             <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 80 }}>
-              <Ionicons name="arrow-back" size={24} color="#1a3b5c" />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1a3b5c', flex: 1 }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text, flex: 1 }}>
               Curso TEAC
             </Text>
             <MenuLateral />
           </View>
 
           {/* BANNER */}
-          <View style={styles.bannerContainer}>
+          <View style={[styles.bannerContainer, isDark && { backgroundColor: colors.card }]}>
             <Image
               source={require("../assets/logo3.png")}
               style={styles.bannerImage}
@@ -143,26 +146,26 @@ export default function Course() {
 
           {/* TÍTULO E SUBTÍTULO */}
           <View style={styles.headerSection}>
-            <Text style={styles.mainTitle}>
+            <Text style={[styles.mainTitle, { color: colors.text }]}>
               Estratégias Diárias para Crianças com TEA
             </Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.subtext }]}>
               Rotina, Comunicação e Comportamento
             </Text>
           </View>
 
-          <View style={styles.courseCard}>
+          <View style={[styles.courseCard, { backgroundColor: colors.card }]}>
             {/* BARRA DE PROGRESSO GLOBAL */}
-            <View style={styles.progressCard}>
+            <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
               <View style={styles.progressRow}>
-                <Text style={styles.progressPercentage}>{progress}%</Text>
-                <View style={styles.progressBarBg}>
+                <Text style={[styles.progressPercentage, { color: colors.accent }]}>{progress}%</Text>
+                <View style={[styles.progressBarBg, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
                   <View
-                    style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: progress === 100 ? '#4CAF50' : '#3B82F6' }]}
+                    style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: progress === 100 ? '#10b981' : colors.accent }]}
                   />
                 </View>
               </View>
-              <Text style={styles.moduleInfo}>
+              <Text style={[styles.moduleInfo, { color: colors.subtext }]}>
                 {progress === 100 ? "Parabéns! Você concluiu o curso." : "Acompanhe seu progresso cartão a cartão!"}
               </Text>
 
@@ -170,7 +173,8 @@ export default function Course() {
               <TouchableOpacity
                 style={[
                   styles.certificateBtn,
-                  progress < 100 && styles.certificateBtnDisabled
+                  { backgroundColor: colors.accent },
+                  progress < 100 && [styles.certificateBtnDisabled, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]
                 ]}
                 onPress={() => progress === 100 && router.push("/certificate")}
                 activeOpacity={progress === 100 ? 0.7 : 1}
@@ -178,25 +182,25 @@ export default function Course() {
                 <Ionicons 
                   name="ribbon-outline" 
                   size={20} 
-                  color={progress === 100 ? "#ffffff" : "#A0AEC0"} 
+                  color={progress === 100 ? "#ffffff" : (isDark ? "#64748b" : "#A0AEC0")} 
                   style={{ marginRight: 8 }}
                 />
                 <Text style={[
                   styles.certificateBtnText,
-                  progress < 100 && styles.certificateBtnTextDisabled
+                  progress < 100 && [styles.certificateBtnTextDisabled, { color: isDark ? "#64748b" : "#A0AEC0" }]
                 ]}>
                   Baixar Certificado Digital
                 </Text>
                 {progress < 100 && (
-                  <Ionicons name="lock-closed" size={14} color="#A0AEC0" style={{ marginLeft: 8 }} />
+                  <Ionicons name="lock-closed" size={14} color={isDark ? "#64748b" : "#A0AEC0"} style={{ marginLeft: 8 }} />
                 )}
               </TouchableOpacity>
             </View>
 
-            <View style={styles.topicsCard}>
+            <View style={[styles.topicsCard, { backgroundColor: colors.card }]}>
               {COURSE_DATA.map((module) => (
                 <View key={module.id} style={styles.moduleSection}>
-                  <Text style={styles.moduleTitle}>{module.title}</Text>
+                  <Text style={[styles.moduleTitle, { color: colors.accent }]}>{module.title}</Text>
                   {module.topics.map((topic, index) => {
                     const completed = isTopicCompleted(topic.id);
                     return (
@@ -208,17 +212,18 @@ export default function Course() {
                           <View
                             style={[
                               styles.topicDot,
-                              completed && styles.topicDotCompleted,
+                              { borderColor: colors.border },
+                              completed && [styles.topicDotCompleted, { backgroundColor: '#10b981', borderColor: '#10b981' }],
                             ]}
                           >
                             {completed && <Ionicons name="checkmark" size={12} color="#ffffff" />}
                           </View>
-                          <Text style={[styles.topicText, completed && { color: '#4CAF50', fontWeight: '600' }]}>
+                          <Text style={[styles.topicText, { color: colors.text }, completed && { color: '#10b981', fontWeight: '600' }]}>
                             {topic.title}
                           </Text>
                         </TouchableOpacity>
                         {index < module.topics.length - 1 && (
-                          <View style={styles.topicSeparator} />
+                          <View style={[styles.topicSeparator, { backgroundColor: colors.border }]} />
                         )}
                       </React.Fragment>
                     );
@@ -229,16 +234,16 @@ export default function Course() {
           </View>
 
           {/* CARD AJUDA */}
-          <View style={styles.helpCard}>
+          <View style={[styles.helpCard, { backgroundColor: colors.card }]}>
             <View style={styles.helpHeader}>
-              <Ionicons name="help-circle" size={24} color="#64b5f6" />
-              <Text style={styles.helpTitle}>Precisa de ajuda?</Text>
+              <Ionicons name="help-circle" size={24} color={colors.accent} />
+              <Text style={[styles.helpTitle, { color: colors.text }]}>Precisa de ajuda?</Text>
             </View>
-            <Text style={styles.helpText}>
+            <Text style={[styles.helpText, { color: colors.subtext }]}>
               Envie sua dúvida no Fórum da Comunidade.
             </Text>
             <TouchableOpacity
-              style={styles.forumBtn}
+              style={[styles.forumBtn, { backgroundColor: colors.accent }]}
               onPress={() => router.push("/forum")}
             >
               <Text style={styles.forumBtnText}>Acessar Fórum</Text>

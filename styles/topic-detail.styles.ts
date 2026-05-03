@@ -31,7 +31,7 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#ffffff",
+    color: "#1a3b5c",
     textAlign: "center",
     marginTop: 20,
     paddingHorizontal: 30,
@@ -176,20 +176,20 @@ export const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "rgba(107,70,193,0.12)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderColor: "rgba(107,70,193,0.25)",
   },
   slideCounterText: {
     fontSize: 16,
-    color: "#ffffff",
+    color: "#6B46C1",
     fontWeight: "bold",
   },
   controlLabel: {
     fontSize: 12,
-    color: "#ffffff",
+    color: "#64748b",
     fontWeight: "600",
   },
 
@@ -199,7 +199,7 @@ export const styles = StyleSheet.create({
   },
   footerProgressBarBg: {
     height: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(107,70,193,0.15)",
     borderRadius: 6,
     width: "100%",
     marginBottom: 10,
@@ -216,7 +216,7 @@ export const styles = StyleSheet.create({
   },
   footerLabelText: {
     fontSize: 13,
-    color: "#ffffff",
+    color: "#1a3b5c",
     fontWeight: "600",
     opacity: 0.9,
   },

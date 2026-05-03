@@ -61,7 +61,7 @@ export const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
     position: "relative",
-    minHeight: 180,
+    minHeight: 210,
   },
   journeyContent: {
     width: "60%",
@@ -168,7 +168,7 @@ export const styles = StyleSheet.create({
     marginRight: 5,
   },
 
-  // -- CARD "RECOMENDADO HOJE"
+  // -- CARD "TESTE O SEU CONHECIMENTO"
   recommendationCard: {
     backgroundColor: "#ffffff",
     borderRadius: 20,
@@ -211,7 +211,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 12,
-    width: "60%",
+    width: "55%",
   },
   verConteudoText: {
     fontSize: 14,

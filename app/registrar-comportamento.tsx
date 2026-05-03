@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/comportamento.styles";
+import { useTheme } from "../context/ThemeContext";
 
 const BEHAVIOR_TYPES = [
   { id: 'calmo', label: 'Calmo', emoji: '😊', color: '#e8f5e9' },
@@ -144,26 +145,28 @@ export default function RegistrarComportamento() {
       // 2. Salvar na nuvem (Firestore)
       await addDoc(collection(db, "users", user.uid, "comportamentos"), newReport);
 
-      // 3. Cache local opcional
-      const existing = await AsyncStorage.getItem('teac_behavior_reports');
+      // 3. Cache local opcional (VINCULADO AO UID)
+      const existing = await AsyncStorage.getItem(`teac_behavior_reports_${user.uid}`);
       const reports = existing ? JSON.parse(existing) : [];
-      await AsyncStorage.setItem('teac_behavior_reports', JSON.stringify([newReport, ...reports]));
+      await AsyncStorage.setItem(`teac_behavior_reports_${user.uid}`, JSON.stringify([newReport, ...reports]));
       
       showToast("Registro salvo com sucesso!", "success");
       
       setTimeout(() => {
         router.back();
       }, 2000);
-    } catch (e: any) {
-      console.error("ERRO AO SALVAR COMPORTAMENTO:", e);
-      showToast("Erro ao salvar: " + e.message, "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <LinearGradient colors={["#e6f5f9", "#e0eaf5", "#dce0f2"]} style={{ flex: 1 }}>
+    <LinearGradient 
+      colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ["#e6f5f9", "#e0eaf5", "#dce0f2"]} 
+      style={{ flex: 1 }}
+    >
       <Toast 
         visible={toastVisible} 
         message={toastMessage} 
@@ -175,54 +178,55 @@ export default function RegistrarComportamento() {
           
           {/* HEADER */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={24} color="#1a3b5c" />
+            <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, isDark && { backgroundColor: colors.card }]}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Registrar comportamento</Text>
-              <Text style={styles.headerSubtitle}>Registre o que seu filho está vivenciando para acompanhar padrões e evoluções.</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Registrar comportamento</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.subtext }]}>Registre o que seu filho está vivenciando para acompanhar padrões e evoluções.</Text>
             </View>
-            <MaterialCommunityIcons name="clipboard-check-outline" size={40} color="#6a7fdb" />
+            <MaterialCommunityIcons name="clipboard-check-outline" size={40} color={colors.accent} />
           </View>
 
           {/* 1. TIPO DE COMPORTAMENTO */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="happy-outline" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>1. Tipo de comportamento</Text>
+              <Ionicons name="happy-outline" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>1. Tipo de comportamento</Text>
             </View>
-            <Text style={styles.cardSubtitle}>Selecione o que melhor descreve o momento.</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.subtext }]}>Selecione o que melhor descreve o momento.</Text>
             <View style={styles.optionsGrid}>
               {BEHAVIOR_TYPES.map((type) => (
                 <TouchableOpacity 
                   key={type.id} 
                   style={[
                     styles.optionItem, 
-                    { backgroundColor: type.color },
-                    selectedType === type.id && { borderColor: '#6a7fdb', borderWidth: 2 }
+                    { backgroundColor: isDark ? colors.background : type.color },
+                    selectedType === type.id && { borderColor: colors.accent, borderWidth: 2 }
                   ]}
                   onPress={() => setSelectedType(type.id)}
                 >
                   <Text style={{ fontSize: 24 }}>{type.emoji}</Text>
-                  <Text style={styles.optionText}>{type.label}</Text>
+                  <Text style={[styles.optionText, { color: colors.text }]}>{type.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TextInput 
-              style={[styles.input, { marginTop: 15 }]} 
+              style={[styles.input, { marginTop: 15, backgroundColor: isDark ? colors.background : '#f8fafc', color: colors.text, borderColor: colors.border }]} 
               placeholder="Descreva um comportamento específico(Opcional)" 
+              placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
               value={customTypeDescription}
               onChangeText={setCustomTypeDescription}
             />
           </View>
 
           {/* 2. INTENSIDADE */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <MaterialCommunityIcons name="chart-bar" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>2. Intensidade</Text>
+              <MaterialCommunityIcons name="chart-bar" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>2. Intensidade</Text>
             </View>
-            <Text style={styles.cardSubtitle}>Qual o nível deste comportamento?</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.subtext }]}>Qual o nível deste comportamento?</Text>
             <View style={styles.intensityContainer}>
               {INTENSITIES.map((item) => (
                 <TouchableOpacity 
@@ -241,87 +245,90 @@ export default function RegistrarComportamento() {
           </View>
 
           {/* 3. O QUE ACONTECEU ANTES? */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="alert-circle-outline" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>3. O que aconteceu antes? (gatilho)</Text>
+              <Ionicons name="alert-circle-outline" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>3. O que aconteceu antes? (gatilho)</Text>
             </View>
-            <Text style={styles.cardSubtitle}>Opcional</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.subtext }]}>Opcional</Text>
             <View style={styles.tagContainer}>
               {TRIGGERS.map(tag => (
                 <TouchableOpacity 
                   key={tag} 
-                  style={[styles.tag, selectedTriggers.includes(tag) && styles.tagActive]}
+                  style={[styles.tag, { backgroundColor: isDark ? colors.background : '#f1f5f9', borderColor: colors.border }, selectedTriggers.includes(tag) && [styles.tagActive, { backgroundColor: colors.accent, borderColor: colors.accent }]]}
                   onPress={() => toggleTrigger(tag)}
                 >
-                  <Text style={[styles.tagText, selectedTriggers.includes(tag) && styles.tagTextActive]}>{tag}</Text>
+                  <Text style={[styles.tagText, { color: colors.text }, selectedTriggers.includes(tag) && styles.tagTextActive]}>{tag}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TextInput 
-              style={styles.input} 
+              style={[styles.input, { backgroundColor: isDark ? colors.background : '#f8fafc', color: colors.text, borderColor: colors.border }]} 
               placeholder="Descreva rapidamente (opcional)" 
+              placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
               value={triggerText}
               onChangeText={setTriggerText}
             />
           </View>
 
           {/* 4. DURAÇÃO */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="time-outline" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>4. Duração</Text>
+              <Ionicons name="time-outline" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>4. Duração</Text>
             </View>
-            <Text style={styles.cardSubtitle}>Quanto tempo durou?</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.subtext }]}>Quanto tempo durou?</Text>
             <View style={styles.tagContainer}>
               {DURATIONS.map(tag => (
                 <TouchableOpacity 
                   key={tag} 
-                  style={[styles.tag, duration === tag && styles.tagActive]}
+                  style={[styles.tag, { backgroundColor: isDark ? colors.background : '#f1f5f9', borderColor: colors.border }, duration === tag && [styles.tagActive, { backgroundColor: colors.accent, borderColor: colors.accent }]]}
                   onPress={() => setDuration(tag)}
                 >
-                  <Text style={[styles.tagText, duration === tag && styles.tagTextActive]}>{tag}</Text>
+                  <Text style={[styles.tagText, { color: colors.text }, duration === tag && styles.tagTextActive]}>{tag}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
           {/* 5. COMO REAGIU / INTERVENÇÃO - ABAIXO DO 4 */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="heart-outline" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>5. Como reagiu / intervenção</Text>
+              <Ionicons name="heart-outline" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>5. Como reagiu / intervenção</Text>
             </View>
-            <Text style={styles.cardSubtitle}>Opcional</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.subtext }]}>Opcional</Text>
             <View style={styles.tagContainer}>
               {INTERVENTIONS.map(tag => (
                 <TouchableOpacity 
                   key={tag} 
-                  style={[styles.tag, selectedInterventions.includes(tag) && styles.tagActive]}
+                  style={[styles.tag, { backgroundColor: isDark ? colors.background : '#f1f5f9', borderColor: colors.border }, selectedInterventions.includes(tag) && [styles.tagActive, { backgroundColor: colors.accent, borderColor: colors.accent }]]}
                   onPress={() => toggleIntervention(tag)}
                 >
-                  <Text style={[styles.tagText, selectedInterventions.includes(tag) && styles.tagTextActive]}>{tag}</Text>
+                  <Text style={[styles.tagText, { color: colors.text }, selectedInterventions.includes(tag) && styles.tagTextActive]}>{tag}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TextInput 
-              style={styles.input} 
+              style={[styles.input, { backgroundColor: isDark ? colors.background : '#f8fafc', color: colors.text, borderColor: colors.border }]} 
               placeholder="Outra intervenção (opcional)" 
+              placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
               value={interventionText}
               onChangeText={setInterventionText}
             />
           </View>
 
           {/* 6. OBSERVAÇÕES */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="document-text-outline" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>6. Observações</Text>
+              <Ionicons name="document-text-outline" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>6. Observações</Text>
             </View>
-            <Text style={styles.cardSubtitle}>Algo importante a lembrar? (opcional)</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.subtext }]}>Algo importante a lembrar? (opcional)</Text>
             <TextInput 
-              style={[styles.input, styles.textArea]} 
+              style={[styles.input, styles.textArea, { backgroundColor: isDark ? colors.background : '#f8fafc', color: colors.text, borderColor: colors.border }]} 
               placeholder="Escreva aqui..." 
+              placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
               multiline
               value={observations}
               onChangeText={setObservations}
@@ -329,26 +336,26 @@ export default function RegistrarComportamento() {
           </View>
 
           {/* DATA E HORÁRIO */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="calendar-outline" size={20} color="#6a7fdb" style={styles.cardIcon} />
-              <Text style={styles.cardTitle}>Data e horário</Text>
+              <Ionicons name="calendar-outline" size={20} color={colors.accent} style={styles.cardIcon} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Data e horário</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>{dateStr} às {timeStr}</Text>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{dateStr} às {timeStr}</Text>
               </View>
 
               <TouchableOpacity 
                 onPress={handleEditDateTime}
                 style={{
-                  backgroundColor: '#4285f4',
+                  backgroundColor: colors.accent,
                   paddingHorizontal: 16,
                   paddingVertical: 8,
                   borderRadius: 12,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  shadowColor: '#4285f4',
+                  shadowColor: colors.accent,
                   shadowOpacity: 0.3,
                   shadowRadius: 4,
                   elevation: 3
@@ -371,9 +378,9 @@ export default function RegistrarComportamento() {
           </View>
 
           {/* BOTÃO SALVAR */}
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Ionicons name="save-outline" size={24} color="#1a3b5c" />
-            <Text style={styles.saveBtnText}>Salvar registro</Text>
+          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={handleSave}>
+            <Ionicons name="save-outline" size={24} color="#ffffff" />
+            <Text style={[styles.saveBtnText, { color: '#ffffff' }]}>Salvar registro</Text>
           </TouchableOpacity>
 
         </ScrollView>

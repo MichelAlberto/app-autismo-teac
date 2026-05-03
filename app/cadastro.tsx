@@ -54,15 +54,13 @@ export default function Register() {
       const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), senha);
       const user = userCredential.user;
 
-      // 2. Definir se é administrador (Email específico)
-      const isAdmin = email.toLowerCase().trim() === 'admin@teac.com';
-
       // 3. Salvar os dados complementares no Firestore
+      // isAdmin é sempre false no cadastro — defina manualmente no console do Firebase.
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         nome: nome,
         email: email.toLowerCase().trim(),
-        isAdmin: isAdmin,
+        isAdmin: false,
         createdAt: new Date().toISOString()
       });
 

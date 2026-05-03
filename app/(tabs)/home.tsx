@@ -1,10 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  Alert,
   Image,
   ScrollView,
   Text,
@@ -14,6 +13,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../../styles/home.styles";
 import { TOPIC_CONTENT } from "../../constants/topicContent";
+import { useTheme } from "../../context/ThemeContext";
+import { db } from "../firebaseConfig";
+import { doc, getDoc, collection, getDocs, query } from "firebase/firestore";
 
 // Lista de dicas focadas em Autismo
 const TIPS = [
@@ -34,65 +36,90 @@ const TIPS = [
 import MenuLateral from "../../components/MenuLateral";
 
 export default function Home() {
+  const { colors, isDark } = useTheme();
   const [userName, setUserName] = useState("");
   const [isCourseComplete, setIsCourseComplete] = useState(false);
   const [isCourseStarted, setIsCourseStarted] = useState(false);
   const [dailyTip, setDailyTip] = useState("");
+  const [isQuizDone, setIsQuizDone] = useState(false);
 
   useEffect(() => {
-    // Sorteia uma dica ao carregar
-    const randomIndex = Math.floor(Math.random() * TIPS.length);
-    setDailyTip(TIPS[randomIndex]);
-
-    const fetchUserAndProgress = async () => {
+    const loadDailyTip = async () => {
       try {
-        // Busca Usuário
+        const q = query(collection(db, "tips"));
+        const querySnapshot = await getDocs(q);
+        const firestoreTips: string[] = [];
+        querySnapshot.forEach((doc) => {
+          firestoreTips.push(doc.data().text);
+        });
+
+        const finalTips = firestoreTips.length > 0 ? firestoreTips : TIPS;
+        const randomIndex = Math.floor(Math.random() * finalTips.length);
+        setDailyTip(finalTips[randomIndex]);
+      } catch (error) {
+        console.error("Erro ao carregar dicas do Firestore:", error);
+        const randomIndex = Math.floor(Math.random() * TIPS.length);
+        setDailyTip(TIPS[randomIndex]);
+      }
+    };
+
+    loadDailyTip();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUserAndProgress = async () => {
+      try {
+        // Busca Usuário e seu Progresso
         const userJson = await AsyncStorage.getItem("teac_current_user");
         if (userJson) {
           const user = JSON.parse(userJson);
           setUserName(user.isAdmin ? "ADMINISTRADOR" : user.nome);
-        }
 
-        // Busca Progresso do Curso (Lista de IDs concluídos)
-        const progressJson = await AsyncStorage.getItem("course_progress_detailed");
-        if (progressJson) {
-          const progressData = JSON.parse(progressJson);
-          
+          // 1. Busca Progresso na Nuvem (Firebase)
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          let cloudProgress = {};
+          if (userDoc.exists()) {
+            cloudProgress = userDoc.data().courseProgress || {};
+          }
+
+          // 2. Busca Progresso Local (Cache)
+          const localData = await AsyncStorage.getItem(`course_progress_detailed_${user.uid}`);
+          const localProgress = localData ? JSON.parse(localData) : {};
+
+          // 3. Mescla e calcula
+          const progressData = { ...localProgress, ...cloudProgress };
+          await AsyncStorage.setItem(`course_progress_detailed_${user.uid}`, JSON.stringify(progressData));
+
           let fullyCompletedTopicsCount = 0;
           let startedTopicsCount = 0;
 
           Object.keys(progressData).forEach((topicId) => {
             const revealedSlides = progressData[topicId].length;
             const totalSlides = TOPIC_CONTENT[topicId] ? TOPIC_CONTENT[topicId].length : 5;
-            
-            if (revealedSlides > 0) {
-              startedTopicsCount++;
-            }
-            if (revealedSlides >= totalSlides) {
-              fullyCompletedTopicsCount++;
-            }
+            if (revealedSlides > 0) startedTopicsCount++;
+            if (revealedSlides >= totalSlides) fullyCompletedTopicsCount++;
           });
 
-          if (startedTopicsCount > 0) {
-            setIsCourseStarted(true);
-          }
+          if (startedTopicsCount > 0) setIsCourseStarted(true);
+          if (fullyCompletedTopicsCount >= 15) setIsCourseComplete(true);
 
-          // O curso tem 15 tópicos no total (5 módulos x 3 tópicos)
-          if (fullyCompletedTopicsCount >= 15) {
-            setIsCourseComplete(true);
-          }
+          // 4. Busca status do Quiz
+          const quizDone = await AsyncStorage.getItem(`quiz_completed_${user.uid}`);
+          if (quizDone === "true") setIsQuizDone(true);
         }
+
       } catch (e) {
         console.error(e);
       }
     };
     fetchUserAndProgress();
-  }, []);
+  }, [])
+);
 
   return (
     <LinearGradient
-      // Manteremos um gradiente claro suave de azul para lilás para combinar com o layout
-      colors={["#e6f5f9", "#e0eaf5", "#dce0f2"]}
+      colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ["#e6f5f9", "#e0eaf5", "#dce0f2"]}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={{ flex: 1 }}>
@@ -109,10 +136,10 @@ export default function Home() {
             paddingBottom: 10
           }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1a3b5c' }}>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
                 Bem-vindo{userName ? `, ${userName}` : ""}!
               </Text>
-              <Text style={{ fontSize: 14, color: '#64748b' }}>
+              <Text style={{ fontSize: 14, color: colors.subtext }}>
                 Continue a jornada de aprendizado.
               </Text>
             </View>
@@ -120,8 +147,12 @@ export default function Home() {
           </View>
 
           {/* CARD 1: COMECE SUA JORNADA */}
-          <View style={[styles.journeyCard, isCourseComplete && { backgroundColor: '#ffffff', borderColor: '#ff9800', borderWidth: 1 }]}>
-            <Text style={styles.cardTitle}>
+          <View style={[
+            styles.journeyCard, 
+            { backgroundColor: colors.card },
+            isCourseComplete && { backgroundColor: isDark ? colors.card : '#ffffff', borderColor: '#ff9800', borderWidth: 1 }
+          ]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
               {isCourseComplete ? "Jornada Concluída! 🎉" : "Comece sua jornada"}
             </Text>
 
@@ -152,12 +183,12 @@ export default function Home() {
 
             <View style={{ flexDirection: 'column', gap: 10 }}>
               <TouchableOpacity
-                style={[styles.iniciarCursoBtn, isCourseComplete && { backgroundColor: '#ff9800' }]}
+                style={styles.iniciarCursoBtn}
                 onPress={() => router.push("/course")}
               >
                 <Text style={styles.iniciarCursoBtnText}>
                   {isCourseComplete 
-                    ? "Rever Curso" 
+                    ? "Refazer Curso" 
                     : isCourseStarted 
                       ? "Continuar Curso" 
                       : "Iniciar Curso"}
@@ -178,52 +209,33 @@ export default function Home() {
             </View>
           </View>
 
-          {/* CARD 2: FÓRUM */}
-          <View style={styles.forumCard}>
-            <Text style={styles.cardTitle}>Acessar o fórum</Text>
-            <Text style={styles.forumDescription}>
-              Envie sua dúvida para um dos nossos especialistas.
-            </Text>
-            <TouchableOpacity
-              style={styles.forumBtn}
-              onPress={() => router.push("/forum")}
-            >
-              <Text style={styles.forumBtnText}>Ir para o Fórum</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* CARD 3: RECOMENDADO HOJE */}
-          <View style={styles.recommendationCard}>
-            <Text style={styles.cardTitle}>Recomendado hoje</Text>
+          {/* CARD 2: TESTE O SEU CONHECIMENTO */}
+          <View style={[styles.recommendationCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Teste o seu conhecimento</Text>
 
             <View style={styles.bulletList}>
               <View style={styles.bulletItem}>
-                <View style={styles.bulletDot} />
-                <Text style={styles.bulletText}>
-                  Como lidar com sobrecarga sensorial
+                <View style={[styles.bulletDot, { backgroundColor: colors.accent }]} />
+                <Text style={[styles.bulletText, { color: colors.subtext }]}>
+                  Coloque em pratica o que você aprendeu no curso.
                 </Text>
               </View>
               <View style={styles.bulletItem}>
-                <View style={styles.bulletDot} />
-                <Text style={styles.bulletText}>Sinais iniciais do TEA</Text>
-              </View>
-              <View style={styles.bulletItem}>
-                <View style={styles.bulletDot} />
-                <Text style={styles.bulletText}>
-                  Estratégias para rotina diária
-                </Text>
+                <View style={[styles.bulletDot, { backgroundColor: colors.accent }]} />
+                <Text style={[styles.bulletText, { color: colors.subtext }]}>Aprenda e desafie amigos ou familiares</Text>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.verConteudoBtn}>
-              <Text style={styles.verConteudoText}>Ver conteúdo</Text>
-              <Ionicons name="chevron-forward" size={18} color="#3b4352" />
+            <TouchableOpacity style={[styles.verConteudoBtn, isDark && { backgroundColor: '#334155' }]} onPress={() => router.push("/quiz")}>
+              <Text style={[styles.verConteudoText, isDark && { color: '#fff' }]}>
+                {isQuizDone ? "Refazer Quiz" : "Iniciar Quiz"}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={isDark ? "#fff" : "#3b4352"} />
             </TouchableOpacity>
 
             {/* Imagem Flutuante na Direita */}
             <View style={styles.absoluteRingContainer}>
-              <View style={styles.floatingImageRing}>
-                {/* Substituir logo2 pela arte redonda depois */}
+              <View style={[styles.floatingImageRing, isDark && { backgroundColor: '#1e293b', borderColor: '#334155' }]}>
                 <Image
                   source={require("../../assets/logo2.png")}
                   style={styles.floatingImage}
@@ -233,82 +245,94 @@ export default function Home() {
             </View>
           </View>
 
-          {/* CARD 3: DICA DO DIA */}
-          <View style={styles.tipCard}>
+          {/* CARD 3: FÓRUM */}
+          <View style={[styles.forumCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Acessar o fórum</Text>
+            <Text style={[styles.forumDescription, { color: colors.subtext }]}>
+              Envie sua dúvida para um dos nossos especialistas.
+            </Text>
+            <TouchableOpacity
+              style={[styles.forumBtn, isDark && { backgroundColor: colors.accent }]}
+              onPress={() => router.push("/forum")}
+            >
+              <Text style={[styles.forumBtnText, isDark && { color: '#fff' }]}>Ir para o Fórum</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* CARD 4: DICA DO DIA */}
+          <View style={[styles.tipCard, { backgroundColor: isDark ? colors.card : '#e3f3ff' }]}>
             <View style={styles.tipHeader}>
               <Ionicons name="bulb" size={24} color="#ff9800" />
-              <Text style={styles.tipTitle}>Dica do dia</Text>
+              <Text style={[styles.tipTitle, { color: colors.text }]}>Dica do dia</Text>
             </View>
-            <Text style={styles.tipText}>
+            <Text style={[styles.tipText, { color: colors.subtext }]}>
               "{dailyTip}"
             </Text>
           </View>
 
-          {/* SEÇÃO NOTIFICAÇÕES */}
+          {/* RECOMENDADOS */}
           <View style={styles.notificationsHeader}>
-            <Text style={styles.notificationsTitle}>Notificações</Text>
+            <Text style={[styles.notificationsTitle, { color: colors.text }]}>Recomendado</Text>
             <TouchableOpacity style={styles.verTudoRow}>
-              <Text style={styles.verTudoText}>Ver tudo</Text>
-              <Ionicons name="chevron-forward" size={16} color="#3b4352" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.gridMenu}>
             <TouchableOpacity
-              style={[styles.gridSquare, { backgroundColor: "#b2dfdb" }]}
+              style={[styles.gridSquare, { backgroundColor: isDark ? '#1e293b' : '#b2dfdb' }]}
               onPress={() => router.push("/relatorios")}
             >
               <MaterialCommunityIcons
                 name="file-document-edit-outline"
                 size={28}
-                color="#4db6ac"
+                color={isDark ? '#4db6ac' : "#4db6ac"}
                 style={styles.gridIconContainer}
               />
-              <Text style={styles.gridText}>Relatório de{"\n"}comportamentos</Text>
+              <Text style={[styles.gridText, { color: colors.text }]}>Relatório de{"\n"}comportamentos</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.gridSquare, { backgroundColor: "#ffcc80" }]}
+              style={[styles.gridSquare, { backgroundColor: isDark ? '#1e293b' : '#ffcc80' }]}
               onPress={() => router.push("/registrar-comportamento")}
             >
               <MaterialCommunityIcons
                 name="clipboard-plus-outline"
                 size={28}
-                color="#ff9800"
+                color={isDark ? '#ff9800' : "#ff9800"}
                 style={styles.gridIconContainer}
               />
-              <Text style={styles.gridText}>Registrar{"\n"}comportamento</Text>
+              <Text style={[styles.gridText, { color: colors.text }]}>Registrar{"\n"}comportamento</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.gridSquare, { backgroundColor: "#bbdefb" }]}
+              style={[styles.gridSquare, { backgroundColor: isDark ? '#1e293b' : '#bbdefb' }]}
               onPress={() => router.push("/criar-rotina")}
             >
               <MaterialCommunityIcons
                 name="view-list"
                 size={28}
-                color="#42a5f5"
+                color={isDark ? '#42a5f5' : "#42a5f5"}
                 style={styles.gridIconContainer}
               />
-              <Text style={styles.gridText}>Criar{"\n"}rotina</Text>
+              <Text style={[styles.gridText, { color: colors.text }]}>Criar{"\n"}rotina</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.gridSquare, { backgroundColor: "#fff59d" }]}
+              style={[styles.gridSquare, { backgroundColor: isDark ? '#1e293b' : '#fff59d' }]}
             >
               <Ionicons
                 name="notifications"
                 size={28}
-                color="#fbc02d"
+                color={isDark ? '#fbc02d' : "#fbc02d"}
                 style={styles.gridIconContainer}
               />
-              <Text style={styles.gridText}>Adicionar{"\n"}lembrete</Text>
+              <Text style={[styles.gridText, { color: colors.text }]}>Adicionar{"\n"}lembrete</Text>
             </TouchableOpacity>
           </View>
 
           {/* CITAÇÃO FINAL */}
-          <View style={styles.footerQuoteBox}>
-            <Text style={styles.footerQuoteText}>
+          <View style={[styles.footerQuoteBox, isDark && { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+            <Text style={[styles.footerQuoteText, { color: colors.text }]}>
               {'"Cada pequeno avanço é uma grande conquista."'}
             </Text>
           </View>

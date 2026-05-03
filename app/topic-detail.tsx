@@ -18,10 +18,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../styles/topic-detail.styles";
 import { TOPIC_CONTENT } from "../constants/topicContent";
 import { TOTAL_COURSE_SLIDES } from "../constants/courseData";
+import { useTheme } from "../context/ThemeContext";
 
 // Removed global screenWidth to use useWindowDimensions
 
 const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenHeight }: any) => {
+  const { colors, isDark } = useTheme();
   const animatedValue = useRef(new Animated.Value(initiallyRevealed ? 180 : 0)).current;
   const [isFlipped, setIsFlipped] = useState(initiallyRevealed);
 
@@ -59,7 +61,7 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenH
 
   return (
     <View style={[styles.slideWrapper, { width: screenWidth }]}>
-      <View style={[styles.card, { width: screenWidth * 0.88, height: screenHeight * 0.52 }]}>
+      <View style={[styles.card, { width: screenWidth * 0.88, height: screenHeight * 0.52, backgroundColor: colors.card, borderColor: colors.border }]}>
         <Animated.View
           pointerEvents={isFlipped ? "none" : "auto"}
           style={[
@@ -70,7 +72,8 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenH
                 { rotateY: frontInterpolate }
               ], 
               opacity: frontOpacity, 
-              zIndex: isFlipped ? 1 : 2 
+              zIndex: isFlipped ? 1 : 2,
+              backgroundColor: colors.card
             }
           ]}
         >
@@ -79,23 +82,23 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenH
             onPress={flipCard}
             style={{ width: '100%', height: '100%', alignItems: 'center' }}
           >
-            <View style={styles.iconContainer}>
-              <Ionicons name={item.icon} size={35} color="#5C6BC0" />
+            <View style={[styles.iconContainer, { backgroundColor: isDark ? colors.background : '#F0F4FF' }]}>
+              <Ionicons name={item.icon} size={35} color={colors.accent} />
             </View>
-            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="lock-closed-outline" size={30} color="#E2E8F0" />
-              <Text style={[styles.cardContent, { color: '#A0AEC0', marginTop: 10, fontSize: 14 }]}>
+              <Ionicons name="lock-closed-outline" size={30} color={isDark ? '#334155' : "#E2E8F0"} />
+              <Text style={[styles.cardContent, { color: colors.subtext, marginTop: 10, fontSize: 14 }]}>
                 Toque para girar o cartão
               </Text>
             </View>
-            <View style={styles.cardFooter}>
+            <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
               <View style={styles.gestureIndicator}>
-                <Ionicons name="arrow-back-outline" size={12} color="#CBD5E0" />
-                <Ionicons name="hand-right-outline" size={18} color="#5C6BC0" style={{ marginHorizontal: 8 }} />
-                <Ionicons name="arrow-forward-outline" size={12} color="#CBD5E0" />
+                <Ionicons name="arrow-back-outline" size={12} color={colors.subtext} />
+                <Ionicons name="hand-right-outline" size={18} color={colors.accent} style={{ marginHorizontal: 8 }} />
+                <Ionicons name="arrow-forward-outline" size={12} color={colors.subtext} />
               </View>
-              <Text style={styles.gestureText}>Deslize para navegar</Text>
+              <Text style={[styles.gestureText, { color: colors.subtext }]}>Deslize para navegar</Text>
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -111,15 +114,16 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenH
                 { rotateY: backInterpolate }
               ], 
               opacity: backOpacity, 
-              zIndex: isFlipped ? 2 : 1 
+              zIndex: isFlipped ? 2 : 1,
+              backgroundColor: colors.card
             }
           ]}
         >
           <TouchableOpacity activeOpacity={0.7} onPress={flipCard} style={{ width: '100%', alignItems: 'center' }}>
-            <View style={styles.iconContainer}>
-              <Ionicons name={item.icon} size={35} color="#5C6BC0" />
+            <View style={[styles.iconContainer, { backgroundColor: isDark ? colors.background : '#F0F4FF' }]}>
+              <Ionicons name={item.icon} size={35} color={colors.accent} />
             </View>
-            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
           </TouchableOpacity>
 
           <ScrollView
@@ -127,13 +131,13 @@ const FlipCard = memo(({ item, initiallyRevealed, onReveal, screenWidth, screenH
             contentContainerStyle={styles.contentScrollContainer}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.cardContent}>{item.content}</Text>
+            <Text style={[styles.cardContent, { color: colors.text }]}>{item.content}</Text>
           </ScrollView>
 
-          <TouchableOpacity activeOpacity={0.7} onPress={flipCard} style={styles.cardFooter}>
+          <TouchableOpacity activeOpacity={0.7} onPress={flipCard} style={[styles.cardFooter, { borderTopColor: colors.border }]}>
             <View style={styles.gestureIndicator}>
-              <Ionicons name="refresh-outline" size={14} color="#5C6BC0" />
-              <Text style={[styles.gestureText, { marginLeft: 5 }]}>Toque para voltar</Text>
+              <Ionicons name="refresh-outline" size={14} color={colors.accent} />
+              <Text style={[styles.gestureText, { marginLeft: 5, color: colors.subtext }]}>Toque para voltar</Text>
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -179,8 +183,8 @@ export default function TopicDetail() {
         cloudProgress = userDoc.data().courseProgress || {};
       }
 
-      // 3. Buscar progresso local (Fallback/Cache)
-      const localData = await AsyncStorage.getItem("course_progress_detailed");
+      // 3. Buscar progresso local (Fallback/Cache) - CHAVE VINCULADA AO UID
+      const localData = await AsyncStorage.getItem(`course_progress_detailed_${user.uid}`);
       const localProgress = localData ? JSON.parse(localData) : {};
 
       // Mesclar os dois (prioridade para a nuvem se existir)
@@ -219,8 +223,8 @@ export default function TopicDetail() {
       newFullProgress[topicId as string] = Array.from(updatedRevealed);
       setFullCourseProgress(newFullProgress);
 
-      // 1. Salvar Localmente
-      await AsyncStorage.setItem("course_progress_detailed", JSON.stringify(newFullProgress));
+      // 1. Salvar Localmente - CHAVE VINCULADA AO UID
+      await AsyncStorage.setItem(`course_progress_detailed_${currentUser.uid}`, JSON.stringify(newFullProgress));
 
       // 2. Salvar no Firestore (Nuvem)
       await setDoc(doc(db, "users", currentUser.uid), {
@@ -276,17 +280,22 @@ export default function TopicDetail() {
     );
   };
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <LinearGradient colors={["#3949AB", "#7E57C2"]} style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient 
+      colors={isDark ? ['#0f172a', '#1e293b', '#0f172a'] : ["#e6f5f9", "#e0eaf5", "#dce0f2"]} 
+      style={styles.container}
+    >
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#3949AB" />
+          <TouchableOpacity style={[styles.backBtn, { backgroundColor: colors.card }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color={colors.accent} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.headerTitle}>{topicTitle}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{topicTitle}</Text>
 
         <View style={styles.slidesContainer}>
           <FlatList
@@ -310,33 +319,43 @@ export default function TopicDetail() {
 
         <View style={styles.controlsContainer}>
           <View style={styles.controlButtonWrapper}>
-            <TouchableOpacity style={[styles.navButton, currentSlide === 0 && { opacity: 0.5 }]} onPress={prevSlide} disabled={currentSlide === 0}>
-              <Ionicons name="chevron-back" size={24} color="#3949AB" />
+            <TouchableOpacity 
+              style={[styles.navButton, { backgroundColor: colors.card }, currentSlide === 0 && { opacity: 0.5 }]} 
+              onPress={prevSlide} 
+              disabled={currentSlide === 0}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.accent} />
             </TouchableOpacity>
-            <Text style={styles.controlLabel}>Anterior</Text>
+            <Text style={[styles.controlLabel, { color: colors.text }]}>Anterior</Text>
           </View>
 
-          <View style={styles.slideCounterBadge}>
+          <View style={[styles.slideCounterBadge, { backgroundColor: colors.accent }]}>
             <Text style={styles.slideCounterText}>
               {currentSlide + 1} / {totalSlides}
             </Text>
           </View>
 
           <View style={styles.controlButtonWrapper}>
-            <TouchableOpacity style={[styles.navButton, currentSlide === totalSlides - 1 && { opacity: 0.5 }]} onPress={nextSlide} disabled={currentSlide === totalSlides - 1}>
-              <Ionicons name="chevron-forward" size={24} color="#3949AB" />
+            <TouchableOpacity 
+              style={[styles.navButton, { backgroundColor: colors.card }, currentSlide === totalSlides - 1 && { opacity: 0.5 }]} 
+              onPress={nextSlide} 
+              disabled={currentSlide === totalSlides - 1}
+            >
+              <Ionicons name="chevron-forward" size={24} color={colors.accent} />
             </TouchableOpacity>
-            <Text style={styles.controlLabel}>Próximo</Text>
+            <Text style={[styles.controlLabel, { color: colors.text }]}>Próximo</Text>
           </View>
         </View>
 
-        <View style={styles.footerProgressContainer}>
+        <View style={[styles.footerProgressContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.footerLabels}>
-            <Text style={styles.footerLabelText}>Progresso do curso</Text>
-            <Text style={styles.footerLabelText}>{globalProgress === 100 ? "Curso concluído!" : `${globalProgress}% concluído`}</Text>
+            <Text style={[styles.footerLabelText, { color: colors.text }]}>Progresso do curso</Text>
+            <Text style={[styles.footerLabelText, { color: colors.accent, fontWeight: 'bold' }]}>
+              {globalProgress === 100 ? "Curso concluído!" : `${globalProgress}% concluído`}
+            </Text>
           </View>
-          <View style={styles.footerProgressBarBg}>
-            <View style={[styles.footerProgressBarFill, { width: `${globalProgress}%`, backgroundColor: globalProgress === 100 ? '#4CAF50' : '#ffffff' }]} />
+          <View style={[styles.footerProgressBarBg, { backgroundColor: isDark ? '#334155' : 'rgba(107, 70, 193, 0.1)' }]}>
+            <View style={[styles.footerProgressBarFill, { width: `${globalProgress}%`, backgroundColor: colors.accent }]} />
           </View>
         </View>
       </SafeAreaView>
